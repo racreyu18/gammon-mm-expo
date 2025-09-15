@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { authService, UserProfile, AuthTokens } from '../services/authService';
+import authService, { UserProfile, AuthTokens } from '../services/authService';
 import { Alert } from 'react-native';
 
 export interface AuthContextType {

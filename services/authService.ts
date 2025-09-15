@@ -89,13 +89,26 @@ class AuthService {
 
   // Generate PKCE challenge
   private async generatePKCE() {
-    const codeVerifier = Crypto.getRandomBytes(32).toString('base64url');
+    // Generate random bytes and convert to base64url manually
+    const randomBytes = await Crypto.getRandomBytesAsync(32);
+    const codeVerifier = this.base64URLEncode(randomBytes);
+    
     const codeChallenge = await Crypto.digestStringAsync(
       Crypto.CryptoDigestAlgorithm.SHA256,
       codeVerifier,
-      { encoding: Crypto.CryptoEncoding.BASE64URL }
+      { encoding: Crypto.CryptoEncoding.BASE64 }
     );
-    return { codeVerifier, codeChallenge };
+    
+    // Convert base64 to base64url
+    const codeChallengeBase64URL = codeChallenge.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    
+    return { codeVerifier, codeChallenge: codeChallengeBase64URL };
+  }
+
+  // Helper method to convert bytes to base64url
+  private base64URLEncode(bytes: Uint8Array): string {
+    const base64 = btoa(String.fromCharCode(...bytes));
+    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
   }
 
   // Create authorization URL
@@ -188,7 +201,8 @@ class AuthService {
       this.notifyStateChange(); // Set loading state
 
       const { codeVerifier, codeChallenge } = await this.generatePKCE();
-      const state = Crypto.getRandomBytes(16).toString('base64url');
+      const stateBytes = await Crypto.getRandomBytesAsync(16);
+      const state = this.base64URLEncode(stateBytes);
       
       // Create auth request with enhanced parameters
       const request = new AuthSession.AuthRequest({
@@ -547,4 +561,6 @@ class AuthService {
   }
 }
 
-export default AuthService.getInstance();
+// Create and export the singleton instance
+const authService = AuthService.getInstance();
+export default authService;

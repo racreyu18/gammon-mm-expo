@@ -191,7 +191,7 @@ export class NetworkStatusManager {
       
       try {
         // Use API health endpoint for connectivity check
-        const baseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
+        const baseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:7060/api';
         const response = await fetch(`${baseUrl}/health`, {
           method: 'GET',
           signal: controller.signal,

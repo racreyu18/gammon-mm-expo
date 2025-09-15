@@ -1,6 +1,11 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import authService, { AuthState, UserProfile, UserSecurity } from '../services/authService';
 
+// Ensure authService is properly initialized
+if (!authService) {
+  throw new Error('AuthService failed to initialize');
+}
+
 interface AuthContextType extends AuthState {
   login: () => Promise<void>;
   logout: () => Promise<void>;
