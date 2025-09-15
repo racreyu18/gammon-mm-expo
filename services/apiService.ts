@@ -163,7 +163,7 @@ class ApiService {
   private baseUrl: string;
 
   private constructor() {
-    this.baseUrl = apiConfig.baseURL;
+    this.baseUrl = apiConfig.baseUrl;
   }
 
   public static getInstance(): ApiService {
@@ -193,7 +193,6 @@ class ApiService {
       const headers = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${accessToken}`,
-        ...apiConfig.headers,
         ...options.headers
       };
 
