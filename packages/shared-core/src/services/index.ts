@@ -6,6 +6,11 @@ import { localStorage, cacheUtils } from '../utils/localStorage';
 import { networkStatus, networkUtils } from '../utils/networkStatus';
 import { logger } from '../utils/logger';
 
+// Export new client services
+export { LocationClient } from './locationClient';
+export { InventoryClient } from './inventoryClient';
+export { UserClient } from './userClient';
+
 export interface MovementServiceConfig { baseUrl: string; tokenProvider?: () => Promise<string>; }
 
 export interface MovementService {

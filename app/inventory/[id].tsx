@@ -12,23 +12,18 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { router, useLocalSearchParams } from 'expo-router';
-import { createMovementService, MovementTransaction } from '@gammon/shared-core';
+import { InventoryClient, InventoryItem } from '@gammon/shared-core';
+import { createMovementClient } from '@gammon/shared-core/services/movementClient';
 import { useAuth } from '../../hooks/useAuth';
 import { useOfflineCapable } from '../../hooks/useOffline';
 import { IconSymbol } from '../../components/ui/icon-symbol';
 import { Colors } from '../../constants/theme';
 import { useColorScheme } from '../../hooks/use-color-scheme';
 
-// Configure service with proper base URL and token provider
-const serviceConfig = {
-  baseUrl: process.env.EXPO_PUBLIC_API_URL || 'https://api.gammon-mm.com',
-  tokenProvider: async () => {
-    // This will be implemented when auth is properly set up
-    return 'mock-token';
-  }
-};
-
-const movementService = createMovementService(serviceConfig);
+// Configure services
+const inventoryService = new InventoryClient(
+  process.env.EXPO_PUBLIC_API_URL || 'https://api.gammon-mm.com'
+);
 
 export default function InventoryItemScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -38,9 +33,22 @@ export default function InventoryItemScreen() {
   const { isOnline } = useOfflineCapable();
   const queryClient = useQueryClient();
   const [showMovementModal, setShowMovementModal] = useState(false);
-  const [movementType, setMovementType] = useState<MovementType>('issue');
+  const [movementType, setMovementType] = useState<'receive' | 'issue' | 'transfer' | 'adjustment'>('issue');
   const [quantity, setQuantity] = useState('');
   const [notes, setNotes] = useState('');
+
+  // Create movement service with token provider
+  const movementService = React.useMemo(() => createMovementClient({
+    baseUrl: process.env.EXPO_PUBLIC_API_URL || 'https://api.gammon-mm.com',
+    tokenProvider: async () => token || ''
+  }), [token]);
+
+  // Update auth tokens when available
+  React.useEffect(() => {
+    if (token) {
+      inventoryService.updateAuthToken(token);
+    }
+  }, [token]);
 
   // Fetch item details
   const {
@@ -50,7 +58,7 @@ export default function InventoryItemScreen() {
     refetch,
   } = useQuery({
     queryKey: ['inventory-item', id, token],
-    queryFn: () => inventoryService.getItemById(token, id!),
+    queryFn: () => inventoryService.getItem(id!),
     enabled: !!token && !!id,
   });
 
@@ -59,18 +67,39 @@ export default function InventoryItemScreen() {
     data: movements = [],
   } = useQuery({
     queryKey: ['inventory-movements', id, token],
-    queryFn: () => inventoryService.getItemMovements(token, id!),
+    queryFn: async () => {
+      try {
+        const result = await movementService.listMovements({ 
+          limit: 50,
+          offset: 0 
+        });
+        // Filter movements for this specific item if needed
+        return Array.isArray(result) ? result.filter((m: any) => m.itemId === id) : [];
+      } catch (error) {
+        console.warn('Failed to fetch movements:', error);
+        return [];
+      }
+    },
     enabled: !!token && !!id,
   });
 
   // Create movement mutation
   const createMovementMutation = useMutation({
-    mutationFn: (data: {
+    mutationFn: async (data: {
       itemId: string;
-      type: MovementType;
+      type: 'receive' | 'issue' | 'transfer' | 'adjustment';
       quantity: number;
       notes?: string;
-    }) => inventoryService.createMovement(token, data),
+    }) => {
+      const movementData = {
+        itemId: data.itemId,
+        type: data.type,
+        quantity: data.quantity,
+        notes: data.notes || '',
+        status: 'pending' as const
+      };
+      return movementService.createMovement(movementData);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory-item', id] });
       queryClient.invalidateQueries({ queryKey: ['inventory-movements', id] });
@@ -120,7 +149,7 @@ export default function InventoryItemScreen() {
     return '#10B981';
   };
 
-  const getMovementTypeIcon = (type: MovementType) => {
+  const getMovementTypeIcon = (type: string) => {
     switch (type) {
       case 'receive': return 'plus.circle.fill';
       case 'issue': return 'minus.circle.fill';
@@ -130,7 +159,7 @@ export default function InventoryItemScreen() {
     }
   };
 
-  const getMovementTypeColor = (type: MovementType) => {
+  const getMovementTypeColor = (type: string) => {
     switch (type) {
       case 'receive': return '#10B981';
       case 'issue': return '#EF4444';
