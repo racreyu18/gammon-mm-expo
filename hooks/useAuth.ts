@@ -1,126 +1,80 @@
 import { useState, useEffect, createContext, useContext } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import authService, { AuthState, UserProfile, UserSecurity } from '../services/authService';
 
-export interface User {
-  id: string;
-  username: string;
-  email: string;
-  role: string;
-  permissions: string[];
-}
-
-export interface AuthState {
-  user: User | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  token: string | null;
-}
-
-export interface AuthContextType extends AuthState {
-  login: (username: string, password: string) => Promise<void>;
+interface AuthContextType extends AuthState {
+  login: () => Promise<void>;
   logout: () => Promise<void>;
-  refreshToken: () => Promise<void>;
+  hasRole: (roleName: string) => Promise<boolean>;
+  hasFunction: (functionName: string) => Promise<boolean>;
+  refreshAuth: () => Promise<void>;
 }
 
 // Create auth context
 export const AuthContext = createContext<AuthContextType | null>(null);
 
-// Mock user for development
-const MOCK_USER: User = {
-  id: '1',
-  username: 'admin',
-  email: 'admin@gammon.com',
-  role: 'admin',
-  permissions: ['read', 'write', 'approve', 'scan']
-};
-
 export function useAuth(): AuthContextType {
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
-    isAuthenticated: false,
     isLoading: true,
-    token: null
+    isAuthenticated: false,
+    tokens: null,
+    userSecurity: null,
+    error: null
   });
 
   useEffect(() => {
-    // Simulate checking for existing auth token
-    const checkAuth = async () => {
+    // Initialize auth state and subscribe to changes
+    const initializeAuth = async () => {
       try {
-        // In a real app, you'd check for stored token and validate it
-        const storedToken = await AsyncStorage.getItem('auth_token');
-        if (storedToken) {
-          setAuthState({
-            user: MOCK_USER,
-            isAuthenticated: true,
-            isLoading: false,
-            token: storedToken
-          });
-        } else {
-          setAuthState(prev => ({ ...prev, isLoading: false }));
-        }
+        await authService.initializeAuth();
       } catch (error) {
-        console.error('Auth check failed:', error);
-        setAuthState(prev => ({ ...prev, isLoading: false }));
+        console.error('Error initializing auth:', error);
       }
     };
 
-    checkAuth();
+    // Subscribe to auth state changes
+    const unsubscribe = authService.onAuthStateChange((newState) => {
+      setAuthState(newState);
+    });
+
+    initializeAuth();
+
+    // Cleanup subscription on unmount
+    return unsubscribe;
   }, []);
 
-  const login = async (username: string, password: string): Promise<void> => {
-    setAuthState(prev => ({ ...prev, isLoading: true }));
-    
+  const login = async (): Promise<void> => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock authentication - in real app, call your auth API
-      if (username === 'admin' && password === 'password') {
-        const token = 'mock_jwt_token_' + Date.now();
-        await AsyncStorage.setItem('auth_token', token);
-        
-        setAuthState({
-          user: MOCK_USER,
-          isAuthenticated: true,
-          isLoading: false,
-          token
-        });
-      } else {
-        throw new Error('Invalid credentials');
-      }
+      await authService.login();
     } catch (error) {
-      setAuthState(prev => ({ ...prev, isLoading: false }));
+      console.error('Login failed:', error);
       throw error;
     }
   };
 
   const logout = async (): Promise<void> => {
     try {
-      await AsyncStorage.removeItem('auth_token');
-      setAuthState({
-        user: null,
-        isAuthenticated: false,
-        isLoading: false,
-        token: null
-      });
+      await authService.logout();
     } catch (error) {
       console.error('Logout failed:', error);
+      throw error;
     }
   };
 
-  const refreshToken = async (): Promise<void> => {
+  const hasRole = async (roleName: string): Promise<boolean> => {
+    return await authService.hasRole(roleName);
+  };
+
+  const hasFunction = async (functionName: string): Promise<boolean> => {
+    return await authService.hasFunction(functionName);
+  };
+
+  const refreshAuth = async (): Promise<void> => {
     try {
-      // In a real app, call your refresh token endpoint
-      const newToken = 'refreshed_token_' + Date.now();
-      await AsyncStorage.setItem('auth_token', newToken);
-      
-      setAuthState(prev => ({
-        ...prev,
-        token: newToken
-      }));
+      await authService.refreshToken();
     } catch (error) {
-      console.error('Token refresh failed:', error);
-      await logout();
+      console.error('Auth refresh failed:', error);
+      throw error;
     }
   };
 
@@ -128,7 +82,9 @@ export function useAuth(): AuthContextType {
     ...authState,
     login,
     logout,
-    refreshToken
+    hasRole,
+    hasFunction,
+    refreshAuth
   };
 }
 

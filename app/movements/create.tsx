@@ -8,7 +8,7 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/providers/AuthProvider';
-import ApiService, { CreateMovementRequest } from '@/services/apiService';
+import { apiService, CreateMovementRequest } from '../../services/api';
 
 function CreateMovementScreenContent() {
   const { t } = useTranslation();

@@ -10,81 +10,64 @@ import {
 import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { createMovementService, createApprovalsService, createNotificationsService } from '@gammon/shared-core';
-import { useAuth } from '../../hooks/useAuth';
+import { apiService } from '../../services/apiService';
+import { useAuth } from '../../providers/AuthProvider';
 import { useOfflineCapability } from '../../hooks/useOffline';
 import { CompactOfflineIndicator } from '../../components/OfflineIndicator';
-
-// Configure services with proper base URL and token provider
-const serviceConfig = {
-  baseUrl: process.env.EXPO_PUBLIC_API_URL || 'https://api.gammon-mm.com',
-  tokenProvider: async () => {
-    // This will be implemented when auth is properly set up
-    return 'mock-token';
-  }
-};
-
-const movementService = createMovementService(serviceConfig);
-const approvalsService = createApprovalsService(serviceConfig);
-const notificationsService = createNotificationsService(serviceConfig);
 
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const { t } = useTranslation();
-  const { token } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { canPerform, message: offlineMessage, isOffline } = useOfflineCapability('read');
 
   // Fetch dashboard data
   const recentMovementsQuery = useQuery({
-    queryKey: ['movements', 'recent', token],
-    queryFn: () => movementService.listMovements(token, { limit: 5 }),
+    queryKey: ['movements', 'recent'],
+    queryFn: () => apiService.getMovements({ limit: 5, sortBy: 'createdAt', sortOrder: 'desc' }),
     staleTime: 5 * 60 * 1000,
-    enabled: !!token,
+    enabled: isAuthenticated,
   });
 
   const pendingApprovalsQuery = useQuery({
-    queryKey: ['approvals', 'pending', token],
-    queryFn: () => approvalsService.listApprovals(token, { status: 'pending', limit: 5 }),
+    queryKey: ['approvals', 'pending'],
+    queryFn: () => apiService.getApprovals({ status: 'pending', limit: 5 }),
     staleTime: 2 * 60 * 1000,
-    enabled: !!token,
+    enabled: isAuthenticated,
   });
 
-  const { data: unreadCount = 0 } = useQuery({
-    queryKey: ['notifications', 'unread-count', token],
-    queryFn: () => notificationsService.getUnreadCount(token),
-    staleTime: 30 * 1000,
-    enabled: !!token,
-  });
+  // Mock unread count for now - this would come from a notifications service
+  const unreadCount = 0;
 
   const quickActions = [
     {
       title: 'Scan Item',
-      subtitle: 'Barcode scanner',
+      subtitle: 'QR/Barcode',
       icon: '📱',
       color: '#3B82F6',
-      onPress: () => router.push('/scan'),
+      onPress: () => router.push('/scanning'),
     },
     {
-      title: 'Inventory Search',
-      subtitle: 'Find items',
-      icon: '🔍',
-      color: '#10B981',
-      onPress: () => router.push('/inventory'),
-    },
-    {
-      title: 'Create Movement',
-      subtitle: 'Transfer items',
+      title: 'View Movements',
+      subtitle: 'Material transfers',
       icon: '📦',
-      color: '#F59E0B',
-      onPress: () => router.push('/movements/create'),
+      color: '#10B981',
+      onPress: () => router.push('/movements'),
     },
     {
       title: 'Pending Approvals',
-      subtitle: `${pendingApprovalsQuery.data?.length || 0} pending`,
+      subtitle: `${pendingApprovalsQuery.data?.data?.length || 0} pending`,
       icon: '✅',
-      color: '#EF4444',
+      color: '#F59E0B',
       onPress: () => router.push('/approvals'),
+    },
+    {
+      title: 'Notifications',
+      subtitle: `${unreadCount} unread`,
+      icon: '🔔',
+      color: '#8B5CF6',
+      onPress: () => router.push('/notifications'),
     },
   ];
 
@@ -192,8 +175,8 @@ export default function HomeScreen() {
           <Text style={styles.emptyText}>Loading transactions...</Text>
         ) : recentMovementsQuery.error ? (
           <Text style={styles.emptyText}>Failed to load transactions</Text>
-        ) : recentMovementsQuery.data && recentMovementsQuery.data.length > 0 ? (
-          recentMovementsQuery.data.slice(0, 3).map(renderRecentMovement)
+        ) : recentMovementsQuery.data?.data && recentMovementsQuery.data.data.length > 0 ? (
+          recentMovementsQuery.data.data.slice(0, 3).map(renderRecentMovement)
         ) : (
           <Text style={styles.emptyText}>No recent transactions</Text>
         )}
@@ -210,11 +193,11 @@ export default function HomeScreen() {
           <Text style={styles.offlineMessage}>{offlineMessage}</Text>
         )}
         {pendingApprovalsQuery.isLoading ? (
-          <Text style={styles.emptyText}>Loading workflow status...</Text>
+          <Text style={styles.emptyText}>Loading approvals...</Text>
         ) : pendingApprovalsQuery.error ? (
-          <Text style={styles.emptyText}>Failed to load workflow status</Text>
-        ) : pendingApprovalsQuery.data && pendingApprovalsQuery.data.length > 0 ? (
-          pendingApprovalsQuery.data.slice(0, 3).map(renderPendingApproval)
+          <Text style={styles.emptyText}>Failed to load approvals</Text>
+        ) : pendingApprovalsQuery.data?.data && pendingApprovalsQuery.data.data.length > 0 ? (
+          pendingApprovalsQuery.data.data.slice(0, 3).map(renderPendingApproval)
         ) : (
           <Text style={styles.emptyText}>All workflows up to date</Text>
         )}

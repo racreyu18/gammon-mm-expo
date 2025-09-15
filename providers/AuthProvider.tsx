@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import AuthService, { UserProfile, AuthTokens } from '../services/authService';
+import { authService, UserProfile, AuthTokens } from '../services/authService';
 import { Alert } from 'react-native';
 
 export interface AuthContextType {
@@ -9,6 +9,8 @@ export interface AuthContextType {
   login: () => Promise<void>;
   logout: () => Promise<void>;
   refreshAuth: () => Promise<void>;
+  hasRole: (role: string) => boolean;
+  hasFunction: (functionName: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -38,10 +40,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const checkAuthStatus = async () => {
     try {
       setIsLoading(true);
-      const authenticated = await AuthService.isAuthenticated();
+      await authService.initializeAuth();
+      const authenticated = await authService.isAuthenticated();
       
       if (authenticated) {
-        const userProfile = await AuthService.getCurrentUser();
+        const userProfile = await authService.getCurrentUser();
         setUser(userProfile);
         setIsAuthenticated(true);
       } else {
@@ -60,7 +63,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async () => {
     try {
       setIsLoading(true);
-      const result = await AuthService.login();
+      const result = await authService.login();
       
       setUser(result.user);
       setIsAuthenticated(true);
@@ -94,7 +97,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = async () => {
     try {
       setIsLoading(true);
-      await AuthService.logout();
+      await authService.logout();
       
       setUser(null);
       setIsAuthenticated(false);
@@ -117,10 +120,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const refreshAuth = async () => {
     try {
-      const tokens = await AuthService.refreshToken();
+      const tokens = await authService.refreshToken();
       
       if (tokens) {
-        const userProfile = await AuthService.getCurrentUser();
+        const userProfile = await authService.getCurrentUser();
         setUser(userProfile);
         setIsAuthenticated(true);
       } else {
@@ -135,13 +138,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const hasRole = (role: string): boolean => {
+    return authService.hasRole(role);
+  };
+
+  const hasFunction = (functionName: string): boolean => {
+    return authService.hasFunction(functionName);
+  };
+
   const contextValue: AuthContextType = {
     isAuthenticated,
     isLoading,
     user,
     login,
     logout,
-    refreshAuth
+    refreshAuth,
+    hasRole,
+    hasFunction
   };
 
   return (

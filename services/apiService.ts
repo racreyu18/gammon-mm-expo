@@ -1,5 +1,5 @@
-import AuthService from './authService';
-import { apiConfig } from '../config/azure';
+import authService from './authService';
+import { apiConfig } from '../config/api';
 
 export interface ApiResponse<T = any> {
   data: T;
@@ -22,29 +22,117 @@ export interface PaginatedResponse<T> {
   hasMore: boolean;
 }
 
+// Project related interfaces (based on Ionic patterns)
+export interface Project {
+  id: string;
+  projectNumber: string;
+  name: string;
+  description?: string;
+  status: string;
+  startDate?: string;
+  endDate?: string;
+  isActive: boolean;
+}
+
+// Location related interfaces
+export interface Location {
+  id: string;
+  locationCode: string;
+  locationEnglish: string;
+  locationChinese: string;
+  projectId: string;
+  isActive: boolean;
+}
+
+// Area related interfaces
+export interface Area {
+  id: string;
+  areaCode: string;
+  areaName: string;
+  locationId: string;
+  isActive: boolean;
+}
+
+// Bin related interfaces
+export interface Bin {
+  id: string;
+  binCode: string;
+  binName: string;
+  areaId: string;
+  capacity?: number;
+  isActive: boolean;
+}
+
+// Item related interfaces
+export interface Item {
+  id: string;
+  itemCode: string;
+  itemName: string;
+  description?: string;
+  categoryId: string;
+  subCategoryId?: string;
+  unit: string;
+  isActive: boolean;
+}
+
+export interface ItemCategory {
+  id: string;
+  categoryCode: string;
+  categoryName: string;
+  description?: string;
+  isActive: boolean;
+}
+
+export interface ItemSubCategory {
+  id: string;
+  subCategoryCode: string;
+  subCategoryName: string;
+  categoryId: string;
+  description?: string;
+  isActive: boolean;
+}
+
 // Movement related interfaces
 export interface Movement {
   id: string;
-  type: 'IN' | 'OUT' | 'TRANSFER';
+  type: 'IN' | 'OUT' | 'TRANSFER' | 'ADJUSTMENT';
   itemCode: string;
   itemDescription: string;
   quantity: number;
   unit: string;
-  location: string;
+  fromLocationId?: string;
+  toLocationId?: string;
+  binId?: string;
   reference: string;
   notes?: string;
   createdAt: string;
   createdBy: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'COMPLETED';
 }
 
 export interface CreateMovementRequest {
-  type: 'IN' | 'OUT' | 'TRANSFER';
+  type: 'IN' | 'OUT' | 'TRANSFER' | 'ADJUSTMENT';
   itemCode: string;
   quantity: number;
-  location: string;
+  fromLocationId?: string;
+  toLocationId?: string;
+  binId?: string;
   reference: string;
   notes?: string;
+}
+
+// Approval related interfaces
+export interface ApprovalHeader {
+  id: string;
+  approvalType: string;
+  referenceNumber: string;
+  description?: string;
+  requestedBy: string;
+  requestedAt: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  approvedBy?: string;
+  approvedAt?: string;
+  comments?: string;
 }
 
 // Inventory related interfaces
@@ -60,12 +148,22 @@ export interface InventoryItem {
   maxStock?: number;
 }
 
+export interface InventoryBalance {
+  id: string;
+  itemId: string;
+  locationId: string;
+  binId?: string;
+  quantity: number;
+  unit: string;
+  lastUpdated: string;
+}
+
 class ApiService {
   private static instance: ApiService;
   private baseUrl: string;
 
   private constructor() {
-    this.baseUrl = apiConfig.baseUrl;
+    this.baseUrl = apiConfig.baseURL;
   }
 
   public static getInstance(): ApiService {
@@ -81,7 +179,7 @@ class ApiService {
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     try {
-      const accessToken = await AuthService.getAccessToken();
+      const accessToken = await authService.getAccessToken();
       
       if (!accessToken) {
         throw new ApiError({
@@ -95,6 +193,7 @@ class ApiService {
       const headers = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${accessToken}`,
+        ...apiConfig.headers,
         ...options.headers
       };
 
@@ -106,13 +205,13 @@ class ApiService {
       if (!response.ok) {
         if (response.status === 401) {
           // Try to refresh token
-          const refreshed = await AuthService.refreshToken();
+          const refreshed = await authService.refreshToken();
           if (refreshed) {
             // Retry request with new token
             return this.request<T>(endpoint, options);
           } else {
             // Redirect to login
-            await AuthService.logout();
+            await authService.logout();
             throw new ApiError({
               message: 'Session expired. Please login again.',
               status: 401,
@@ -182,6 +281,80 @@ class ApiService {
     });
   }
 
+  // Project API methods
+  public async getProjects(params?: { projectNumber?: string }): Promise<ApiResponse<Project[]>> {
+    const queryParams = new URLSearchParams();
+    if (params?.projectNumber) {
+      queryParams.append('projectNumber', params.projectNumber);
+    }
+    
+    const endpoint = `/projects${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    return this.get<Project[]>(endpoint);
+  }
+
+  public async getProject(id: string): Promise<ApiResponse<Project>> {
+    return this.get<Project>(`/projects/${id}`);
+  }
+
+  // Location API methods
+  public async getLocations(projectId?: string): Promise<ApiResponse<Location[]>> {
+    const endpoint = projectId ? `/locations?projectId=${projectId}` : '/locations';
+    return this.get<Location[]>(endpoint);
+  }
+
+  public async getLocation(id: string): Promise<ApiResponse<Location>> {
+    return this.get<Location>(`/locations/${id}`);
+  }
+
+  // Area API methods
+  public async getAreas(locationId?: string): Promise<ApiResponse<Area[]>> {
+    const endpoint = locationId ? `/areas?locationId=${locationId}` : '/areas';
+    return this.get<Area[]>(endpoint);
+  }
+
+  public async getArea(id: string): Promise<ApiResponse<Area>> {
+    return this.get<Area>(`/areas/${id}`);
+  }
+
+  // Bin API methods
+  public async getBins(areaId?: string): Promise<ApiResponse<Bin[]>> {
+    const endpoint = areaId ? `/bins?areaId=${areaId}` : '/bins';
+    return this.get<Bin[]>(endpoint);
+  }
+
+  public async getBin(id: string): Promise<ApiResponse<Bin>> {
+    return this.get<Bin>(`/bins/${id}`);
+  }
+
+  // Item API methods
+  public async getItems(params?: { 
+    categoryId?: string; 
+    subCategoryId?: string; 
+    search?: string;
+  }): Promise<ApiResponse<Item[]>> {
+    const queryParams = new URLSearchParams();
+    if (params?.categoryId) queryParams.append('categoryId', params.categoryId);
+    if (params?.subCategoryId) queryParams.append('subCategoryId', params.subCategoryId);
+    if (params?.search) queryParams.append('search', params.search);
+    
+    const endpoint = `/items${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    return this.get<Item[]>(endpoint);
+  }
+
+  public async getItem(id: string): Promise<ApiResponse<Item>> {
+    return this.get<Item>(`/items/${id}`);
+  }
+
+  // Item Category API methods
+  public async getItemCategories(): Promise<ApiResponse<ItemCategory[]>> {
+    return this.get<ItemCategory[]>('/item-categories');
+  }
+
+  public async getItemSubCategories(categoryId?: string): Promise<ApiResponse<ItemSubCategory[]>> {
+    const endpoint = categoryId ? `/item-subcategories?categoryId=${categoryId}` : '/item-subcategories';
+    return this.get<ItemSubCategory[]>(endpoint);
+  }
+
   // Movement API methods
   public async getMovements(page = 1, limit = 20): Promise<ApiResponse<PaginatedResponse<Movement>>> {
     return this.get<PaginatedResponse<Movement>>(`/movements?page=${page}&limit=${limit}`);
@@ -209,6 +382,35 @@ class ApiService {
 
   public async rejectMovement(id: string, reason?: string): Promise<ApiResponse<Movement>> {
     return this.patch<Movement>(`/movements/${id}/reject`, { reason });
+  }
+
+  // Approval API methods
+  public async getApprovals(params?: {
+    approvalType?: string;
+    status?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<ApiResponse<PaginatedResponse<ApprovalHeader>>> {
+    const queryParams = new URLSearchParams();
+    if (params?.approvalType) queryParams.append('approvalType', params.approvalType);
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    
+    const endpoint = `/approvals${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    return this.get<PaginatedResponse<ApprovalHeader>>(endpoint);
+  }
+
+  public async getApproval(id: string): Promise<ApiResponse<ApprovalHeader>> {
+    return this.get<ApprovalHeader>(`/approvals/${id}`);
+  }
+
+  public async approveRequest(id: string, comments?: string): Promise<ApiResponse<ApprovalHeader>> {
+    return this.post<ApprovalHeader>(`/approvals/${id}/approve`, { comments });
+  }
+
+  public async rejectRequest(id: string, comments: string): Promise<ApiResponse<ApprovalHeader>> {
+    return this.post<ApprovalHeader>(`/approvals/${id}/reject`, { comments });
   }
 
   // Inventory API methods
@@ -253,6 +455,25 @@ class ApiService {
 
   public async getLowStockItems(): Promise<ApiResponse<InventoryItem[]>> {
     return this.get<InventoryItem[]>('/inventory/low-stock');
+  }
+
+  // Inventory Balance API methods
+  public async getInventoryBalances(params?: {
+    itemId?: string;
+    locationId?: string;
+    binId?: string;
+  }): Promise<ApiResponse<InventoryBalance[]>> {
+    const queryParams = new URLSearchParams();
+    if (params?.itemId) queryParams.append('itemId', params.itemId);
+    if (params?.locationId) queryParams.append('locationId', params.locationId);
+    if (params?.binId) queryParams.append('binId', params.binId);
+    
+    const endpoint = `/inventory-balances${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    return this.get<InventoryBalance[]>(endpoint);
+  }
+
+  public async getInventoryBalance(id: string): Promise<ApiResponse<InventoryBalance>> {
+    return this.get<InventoryBalance>(`/inventory-balances/${id}`);
   }
 
   // User profile

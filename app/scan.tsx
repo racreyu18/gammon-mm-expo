@@ -9,7 +9,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/providers/AuthProvider';
-import ApiService from '@/services/apiService';
+import { apiService } from '../services/api';
 
 const { width, height } = Dimensions.get('window');
 
