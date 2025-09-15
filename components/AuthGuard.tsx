@@ -1,0 +1,56 @@
+import React from 'react';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import { useAuth } from '../providers/AuthProvider';
+import { ThemedText } from './themed-text';
+import { ThemedView } from './themed-view';
+import { Colors } from '../constants/theme';
+import { useColorScheme } from '../hooks/use-color-scheme';
+import LoginScreen from './LoginScreen';
+
+interface AuthGuardProps {
+  children: React.ReactNode;
+  fallback?: React.ReactNode;
+}
+
+export const AuthGuard: React.FC<AuthGuardProps> = ({ children, fallback }) => {
+  const { isAuthenticated, isLoading } = useAuth();
+  const colorScheme = useColorScheme();
+
+  if (isLoading) {
+    return (
+      <ThemedView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator 
+            size="large" 
+            color={Colors[colorScheme ?? 'light'].tint} 
+          />
+          <ThemedText style={styles.loadingText}>Checking authentication...</ThemedText>
+        </View>
+      </ThemedView>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return fallback || <LoginScreen />;
+  }
+
+  return <>{children}</>;
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    opacity: 0.7,
+  },
+});
+
+export default AuthGuard;

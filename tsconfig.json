@@ -2,10 +2,11 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    "baseUrl": "./",
     "paths": {
-      "@/*": [
-        "./*"
-      ]
+      "@/*": ["./*"],
+      "@gammon/shared-core": ["./packages/shared-core/src"],
+      "@gammon/shared-core/*": ["./packages/shared-core/src/*"]
     }
   },
   "include": [

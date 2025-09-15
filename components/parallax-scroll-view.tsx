@@ -1,11 +1,25 @@
 import type { PropsWithChildren, ReactElement } from 'react';
-import { StyleSheet } from 'react-native';
-import Animated, {
-  interpolate,
-  useAnimatedRef,
-  useAnimatedStyle,
-  useScrollOffset,
-} from 'react-native-reanimated';
+import { StyleSheet, ScrollView, View, Platform } from 'react-native';
+
+// Conditionally import Reanimated for non-web platforms
+let Animated: any;
+let useAnimatedRef: any;
+let useAnimatedStyle: any;
+let useScrollOffset: any;
+let interpolate: any;
+
+if (Platform.OS !== 'web') {
+  try {
+    const reanimated = require('react-native-reanimated');
+    Animated = reanimated.default;
+    useAnimatedRef = reanimated.useAnimatedRef;
+    useAnimatedStyle = reanimated.useAnimatedStyle;
+    useScrollOffset = reanimated.useScrollOffset;
+    interpolate = reanimated.interpolate;
+  } catch (error) {
+    console.warn('Failed to load react-native-reanimated:', error);
+  }
+}
 
 import { ThemedView } from '@/components/themed-view';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -25,7 +39,26 @@ export default function ParallaxScrollView({
 }: Props) {
   const backgroundColor = useThemeColor({}, 'background');
   const colorScheme = useColorScheme() ?? 'light';
-  const scrollRef = useAnimatedRef<Animated.ScrollView>();
+  
+  // Use conditional components and hooks based on platform
+  if (Platform.OS === 'web' || !Animated) {
+    // Web fallback without animations
+    return (
+      <ScrollView style={{ backgroundColor, flex: 1 }}>
+        <View
+          style={[
+            styles.header,
+            { backgroundColor: headerBackgroundColor[colorScheme] },
+          ]}>
+          {headerImage}
+        </View>
+        <ThemedView style={styles.content}>{children}</ThemedView>
+      </ScrollView>
+    );
+  }
+  
+  // Native implementation with Reanimated
+  const scrollRef = useAnimatedRef<any>();
   const scrollOffset = useScrollOffset(scrollRef);
   const headerAnimatedStyle = useAnimatedStyle(() => {
     return {
