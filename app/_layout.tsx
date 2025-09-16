@@ -24,6 +24,7 @@ import { useColorScheme } from '../hooks/use-color-scheme';
 import { AppProviders } from '@/providers/app-providers';
 import { OfflineIndicator } from '../components/OfflineIndicator';
 import { AuthGuard } from '../components/AuthGuard';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -46,28 +47,30 @@ export default function RootLayout() {
 
   return (
     <AppProviders>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <AuthGuard>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="scan" options={{ headerShown: false }} />
-            <Stack.Screen name="inventory" options={{ headerShown: false }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-            <Stack.Screen name="movements" options={{ headerShown: false }} />
-            <Stack.Screen name="approvals" options={{ headerShown: false }} />
-            <Stack.Screen name="notifications" options={{ headerShown: false }} />
-            <Stack.Screen 
-              name="settings/offline" 
-              options={{ 
-                title: 'Offline Settings',
-                headerShown: true 
-              }} 
-            />
-          </Stack>
-        </AuthGuard>
-        <OfflineIndicator />
-        <StatusBar style="auto" />
-      </ThemeProvider>
+      <ErrorBoundary>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <AuthGuard>
+            <Stack>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="scan" options={{ headerShown: false }} />
+              <Stack.Screen name="inventory" options={{ headerShown: false }} />
+              <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="movements" options={{ headerShown: false }} />
+              <Stack.Screen name="approvals" options={{ headerShown: false }} />
+              <Stack.Screen name="notifications" options={{ headerShown: false }} />
+              <Stack.Screen 
+                name="settings/offline" 
+                options={{ 
+                  title: 'Offline Settings',
+                  headerShown: true 
+                }} 
+              />
+            </Stack>
+          </AuthGuard>
+          <OfflineIndicator />
+          <StatusBar style="auto" />
+        </ThemeProvider>
+      </ErrorBoundary>
     </AppProviders>
   );
 }

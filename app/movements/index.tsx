@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
 import { createMovementService, MovementTransaction } from '@gammon/shared-core';
 import { useAuth } from '../../hooks/useAuth';
+import { ButtonLoading, useAsyncOperation } from '../../utils/loadingState';
 
 // Configure service with proper base URL and token provider
 const serviceConfig = {
@@ -30,6 +31,9 @@ export default function MovementsScreen() {
   const queryClient = useQueryClient();
   const { token } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Use loading state utilities for status updates
+  const { execute: executeStatusUpdate, isLoading: isUpdatingStatus } = useAsyncOperation();
 
   // Fetch movements
   const {
@@ -66,7 +70,15 @@ export default function MovementsScreen() {
   const handleStatusUpdate = (movement: MovementTransaction) => {
     const nextStatus = getNextStatus(movement.status);
     if (nextStatus) {
-      updateStatusMutation.mutate({ id: movement.id, status: nextStatus });
+      executeStatusUpdate(async () => {
+        await updateStatusMutation.mutateAsync({ id: movement.id, status: nextStatus });
+      }, {
+        errorMessage: t('common.error'),
+        onError: (error) => {
+          console.error('Status update error:', error);
+          Alert.alert(t('common.error'), error.message);
+        }
+      });
     }
   };
 
@@ -123,10 +135,10 @@ export default function MovementsScreen() {
           <TouchableOpacity
             style={styles.actionButton}
             onPress={() => handleStatusUpdate(item)}
-            disabled={updateStatusMutation.isPending}
+            disabled={isUpdatingStatus}
           >
             <Text style={styles.actionButtonText}>
-              {updateStatusMutation.isPending ? t('common.loading') : `→ ${t(`movements.status.${getNextStatus(item.status)}`)}`}
+              {isUpdatingStatus ? t('common.loading') : `→ ${t(`movements.status.${getNextStatus(item.status)}`)}`}
             </Text>
           </TouchableOpacity>
         )}

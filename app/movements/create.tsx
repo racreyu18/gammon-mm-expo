@@ -9,13 +9,17 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/providers/AuthProvider';
 import { apiService, CreateMovementRequest } from '../../services/api';
+import { FormValidator, CommonSchemas, InputSanitizer } from '../../utils/inputValidation';
+import { ButtonLoading, useAsyncOperation } from '../../utils/loadingState';
 
 function CreateMovementScreenContent() {
   const { t } = useTranslation();
   const router = useRouter();
   const colorScheme = useColorScheme();
   const { user } = useAuth();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Use the new loading state utilities
+  const { execute: executeSubmit, isLoading: isSubmitting } = useAsyncOperation();
   const [formData, setFormData] = useState({
     itemCode: '',
     description: '',
@@ -25,27 +29,97 @@ function CreateMovementScreenContent() {
     notes: '',
     type: 'IN' as 'IN' | 'OUT' | 'TRANSFER'
   });
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [fieldTouched, setFieldTouched] = useState<Record<string, boolean>>({});
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    // Sanitize input based on field type
+    let sanitizedValue = value;
+    if (field === 'itemCode') {
+      sanitizedValue = InputSanitizer.sanitizeMaterialCode(value);
+    } else if (field === 'quantity') {
+      // Allow typing but don't sanitize until blur for better UX
+      sanitizedValue = value;
+    } else {
+      sanitizedValue = InputSanitizer.sanitizeString(value);
+    }
+
+    setFormData(prev => ({ ...prev, [field]: sanitizedValue }));
+    
+    // Clear validation error when user starts typing
+    if (validationErrors[field]) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
   };
 
-  const handleSubmit = async () => {
+  const handleFieldBlur = (field: string) => {
+    setFieldTouched(prev => ({ ...prev, [field]: true }));
+    
+    // Validate individual field on blur
+    const fieldValue = formData[field as keyof typeof formData];
+    let isValid = true;
+    let errorMessage = '';
+
+    if (field === 'itemCode' && fieldValue) {
+      const result = FormValidator.validate({ itemCode: fieldValue }, { itemCode: CommonSchemas.materialMovement.itemCode });
+      if (!result.isValid && result.errors.itemCode) {
+        isValid = false;
+        errorMessage = result.errors.itemCode;
+      }
+    } else if (field === 'quantity' && fieldValue) {
+      // Sanitize quantity on blur
+      const sanitizedQuantity = InputSanitizer.sanitizeQuantity(fieldValue);
+      if (sanitizedQuantity !== null) {
+        setFormData(prev => ({ ...prev, quantity: sanitizedQuantity.toString() }));
+      }
+      
+      const result = FormValidator.validate({ quantity: fieldValue }, { quantity: CommonSchemas.materialMovement.quantity });
+      if (!result.isValid && result.errors.quantity) {
+        isValid = false;
+        errorMessage = result.errors.quantity;
+      }
+    }
+
+    if (!isValid) {
+      setValidationErrors(prev => ({ ...prev, [field]: errorMessage }));
+    }
+  };
+
+  const validateForm = () => {
+    // Use comprehensive validation
+    const validationResult = FormValidator.validate(formData, CommonSchemas.materialMovement);
+    
+    if (!validationResult.isValid) {
+      setValidationErrors(validationResult.errors);
+      // Mark all fields as touched to show errors
+      const touchedFields = Object.keys(formData).reduce((acc, key) => {
+        acc[key] = true;
+        return acc;
+      }, {} as Record<string, boolean>);
+      setFieldTouched(touchedFields);
+      
+      // Show first error in alert
+      const firstError = Object.values(validationResult.errors)[0];
+      Alert.alert(t('error'), firstError);
+      return false;
+    }
+    
+    return true;
+  };
+
+  const handleSubmit = () => {
     // Validate form
-    if (!formData.itemCode || !formData.quantity || !formData.location || !formData.reference) {
-      Alert.alert(t('common.error'), t('movements.validation.required_fields'));
+    if (!validateForm()) {
       return;
     }
 
     const quantity = parseFloat(formData.quantity);
-    if (isNaN(quantity) || quantity <= 0) {
-      Alert.alert(t('common.error'), t('movements.validation.invalid_quantity'));
-      return;
-    }
 
-    try {
-      setIsSubmitting(true);
-      
+    executeSubmit(async () => {
       const movementData: CreateMovementRequest = {
         type: formData.type,
         itemCode: formData.itemCode.trim(),
@@ -55,7 +129,7 @@ function CreateMovementScreenContent() {
         notes: formData.notes.trim() || undefined
       };
 
-      const response = await ApiService.createMovement(movementData);
+      const response = await apiService.createMovement(movementData);
       
       if (response.success) {
         Alert.alert(
@@ -69,18 +143,17 @@ function CreateMovementScreenContent() {
           ]
         );
       }
-    } catch (error: any) {
-      console.error('Create movement error:', error);
-      
-      let errorMessage = t('movements.create.error');
-      if (error.message) {
-        errorMessage = error.message;
+    }, {
+      errorMessage: t('movements.create.error'),
+      onError: (error) => {
+        console.error('Create movement error:', error);
+        let errorMessage = t('movements.create.error');
+        if (error.message) {
+          errorMessage = error.message;
+        }
+        Alert.alert(t('common.error'), errorMessage);
       }
-      
-      Alert.alert(t('common.error'), errorMessage);
-    } finally {
-      setIsSubmitting(false);
-    }
+    });
   };
 
   return (
@@ -94,12 +167,23 @@ function CreateMovementScreenContent() {
           <View style={styles.inputGroup}>
             <ThemedText style={styles.label}>{t('movements.item_code')} *</ThemedText>
             <TextInput
-              style={[styles.input, { borderColor: Colors[colorScheme ?? 'light'].tabIconDefault }]}
+              style={[
+                styles.input, 
+                { 
+                  borderColor: (fieldTouched.itemCode && validationErrors.itemCode) 
+                    ? Colors[colorScheme ?? 'light'].destructive 
+                    : Colors[colorScheme ?? 'light'].tabIconDefault 
+                }
+              ]}
               value={formData.itemCode}
               onChangeText={(value) => handleInputChange('itemCode', value)}
+              onBlur={() => handleFieldBlur('itemCode')}
               placeholder={t('movements.create.item_code_placeholder')}
               placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
             />
+            {fieldTouched.itemCode && validationErrors.itemCode && (
+              <ThemedText style={styles.errorText}>{validationErrors.itemCode}</ThemedText>
+            )}
           </View>
 
           <View style={styles.inputGroup}>
@@ -118,35 +202,68 @@ function CreateMovementScreenContent() {
           <View style={styles.inputGroup}>
             <ThemedText style={styles.label}>{t('movements.quantity')} *</ThemedText>
             <TextInput
-              style={[styles.input, { borderColor: Colors[colorScheme ?? 'light'].tabIconDefault }]}
+              style={[
+                styles.input, 
+                { 
+                  borderColor: (fieldTouched.quantity && validationErrors.quantity) 
+                    ? Colors[colorScheme ?? 'light'].destructive 
+                    : Colors[colorScheme ?? 'light'].tabIconDefault 
+                }
+              ]}
               value={formData.quantity}
               onChangeText={(value) => handleInputChange('quantity', value)}
+              onBlur={() => handleFieldBlur('quantity')}
               placeholder={t('movements.create.quantity_placeholder')}
               placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
               keyboardType="numeric"
             />
+            {fieldTouched.quantity && validationErrors.quantity && (
+              <ThemedText style={styles.errorText}>{validationErrors.quantity}</ThemedText>
+            )}
           </View>
 
           <View style={styles.inputGroup}>
             <ThemedText style={styles.label}>{t('movements.location')} *</ThemedText>
             <TextInput
-              style={[styles.input, { borderColor: Colors[colorScheme ?? 'light'].tabIconDefault }]}
+              style={[
+                styles.input, 
+                { 
+                  borderColor: (fieldTouched.location && validationErrors.location) 
+                    ? Colors[colorScheme ?? 'light'].destructive 
+                    : Colors[colorScheme ?? 'light'].tabIconDefault 
+                }
+              ]}
               value={formData.location}
               onChangeText={(value) => handleInputChange('location', value)}
+              onBlur={() => handleFieldBlur('location')}
               placeholder={t('movements.create.location_placeholder')}
               placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
             />
+            {fieldTouched.location && validationErrors.location && (
+              <ThemedText style={styles.errorText}>{validationErrors.location}</ThemedText>
+            )}
           </View>
 
           <View style={styles.inputGroup}>
             <ThemedText style={styles.label}>{t('movements.reference')} *</ThemedText>
             <TextInput
-              style={[styles.input, { borderColor: Colors[colorScheme ?? 'light'].tabIconDefault }]}
+              style={[
+                styles.input, 
+                { 
+                  borderColor: (fieldTouched.reference && validationErrors.reference) 
+                    ? Colors[colorScheme ?? 'light'].destructive 
+                    : Colors[colorScheme ?? 'light'].tabIconDefault 
+                }
+              ]}
               value={formData.reference}
               onChangeText={(value) => handleInputChange('reference', value)}
+              onBlur={() => handleFieldBlur('reference')}
               placeholder={t('movements.create.reference_placeholder')}
               placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
             />
+            {fieldTouched.reference && validationErrors.reference && (
+              <ThemedText style={styles.errorText}>{validationErrors.reference}</ThemedText>
+            )}
           </View>
 
           <View style={styles.inputGroup}>
@@ -171,17 +288,15 @@ function CreateMovementScreenContent() {
             <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.button, styles.submitButton, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
+          <ButtonLoading
             onPress={handleSubmit}
-            disabled={isSubmitting}
+            isLoading={isSubmitting}
+            style={[styles.button, styles.submitButton, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
+            textStyle={styles.submitButtonText}
+            loadingColor="#fff"
           >
-            {isSubmitting ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Text style={styles.submitButtonText}>{t('movements.create.submit')}</Text>
-            )}
-          </TouchableOpacity>
+            {t('movements.create.submit')}
+          </ButtonLoading>
         </View>
       </ScrollView>
     </ThemedView>
@@ -219,6 +334,11 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     backgroundColor: 'transparent',
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#dc3545',
+    marginTop: 4,
   },
   buttonContainer: {
     flexDirection: 'row',

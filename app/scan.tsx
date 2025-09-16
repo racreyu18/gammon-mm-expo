@@ -10,6 +10,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/providers/AuthProvider';
 import { apiService } from '../services/api';
+import { LoadingIndicator, useAsyncOperation } from '../utils/loadingState';
 
 const { width, height } = Dimensions.get('window');
 
@@ -20,7 +21,9 @@ function ScanningScreenContent() {
   const { user } = useAuth();
   const [isScanning, setIsScanning] = useState(false);
   const [scannedData, setScannedData] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  
+  // Use async operation hook for processing scan results
+  const { executeAsync: executeScanProcessing, isLoading: isProcessing } = useAsyncOperation();
 
   const startScanning = () => {
     setIsScanning(true);
@@ -39,11 +42,9 @@ function ScanningScreenContent() {
 
   const handleScanResult = async () => {
     if (scannedData && !isProcessing) {
-      setIsProcessing(true);
-      
-      try {
+      await executeScanProcessing(async () => {
         // First, try to get item information from the API
-        const itemResponse = await ApiService.scanBarcode(scannedData);
+        const itemResponse = await apiService.scanBarcode(scannedData);
         
         if (itemResponse.success && itemResponse.data) {
           const item = itemResponse.data;
@@ -95,35 +96,36 @@ function ScanningScreenContent() {
             ]
           );
         }
-      } catch (error: any) {
-        console.error('Barcode scan error:', error);
-        
-        // Fallback to basic scan result handling
-        Alert.alert(
-          t('scanning.result_title'),
-          `${t('scanning.scanned_code')}: ${scannedData}`,
-          [
-            {
-              text: t('scanning.scan_again'),
-              onPress: () => {
-                setScannedData(null);
-                startScanning();
+      }, {
+        errorMessage: t('scanning.processing_error'),
+        onError: (error) => {
+          console.error('Barcode scan error:', error);
+          
+          // Fallback to basic scan result handling
+          Alert.alert(
+            t('scanning.result_title'),
+            `${t('scanning.scanned_code')}: ${scannedData}`,
+            [
+              {
+                text: t('scanning.scan_again'),
+                onPress: () => {
+                  setScannedData(null);
+                  startScanning();
+                }
+              },
+              {
+                text: t('scanning.use_code'),
+                onPress: () => {
+                  router.push({
+                    pathname: '/movements/create',
+                    params: { itemCode: scannedData }
+                  });
+                }
               }
-            },
-            {
-              text: t('scanning.use_code'),
-              onPress: () => {
-                router.push({
-                  pathname: '/movements/create',
-                  params: { itemCode: scannedData }
-                });
-              }
-            }
-          ]
-        );
-      } finally {
-        setIsProcessing(false);
-      }
+            ]
+          );
+        }
+      });
     }
   };
 
@@ -140,6 +142,9 @@ function ScanningScreenContent() {
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
+          accessibilityLabel="Go back"
+          accessibilityHint="Returns to the previous screen"
+          accessibilityRole="button"
         >
           <IconSymbol name="chevron.left" size={24} color={Colors[colorScheme ?? 'light'].text} />
         </TouchableOpacity>
@@ -163,6 +168,9 @@ function ScanningScreenContent() {
             <TouchableOpacity
               style={[styles.scanButton, { backgroundColor: Colors[colorScheme ?? 'light'].tint }]}
               onPress={startScanning}
+              accessibilityLabel="Start barcode scan"
+              accessibilityHint="Opens camera to scan material barcodes"
+              accessibilityRole="button"
             >
               <IconSymbol name="camera" size={24} color="#fff" />
               <Text style={styles.scanButtonText}>{t('scanning.start_scan')}</Text>
@@ -184,9 +192,22 @@ function ScanningScreenContent() {
             <TouchableOpacity
               style={styles.cancelButton}
               onPress={stopScanning}
+              accessibilityLabel="Cancel scan"
+              accessibilityHint="Stops the current barcode scanning session"
+              accessibilityRole="button"
             >
               <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
+          </View>
+        )}
+
+        {isProcessing && (
+          <View style={styles.processingView}>
+            <LoadingIndicator 
+              message={t('scanning.processing')} 
+              size="large"
+              color={Colors[colorScheme ?? 'light'].tint}
+            />
           </View>
         )}
       </View>
@@ -313,6 +334,16 @@ const styles = StyleSheet.create({
   scanningText: {
     fontSize: 18,
     marginBottom: 24,
+  },
+  processingView: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
   },
   cancelButton: {
     paddingVertical: 12,

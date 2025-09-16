@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "gammon-mm-expo",
+    "name": "Gammon Material Management",
     "slug": "gammon-mm-expo",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,11 +8,17 @@
     "scheme": "gammonmmexpo",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "description": "Advanced material management system for Gammon construction projects with inventory tracking, movement management, and offline capabilities.",
+    "privacy": "public",
+    "platforms": ["ios", "android", "web"],
+    "keywords": ["material management", "inventory", "construction", "gammon", "tracking"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.gammonmmexpo",
+      "bundleIdentifier": "com.gammon.materialmanagement",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "This app uses the camera to scan QR codes and barcodes for inventory management.",
+        "NSLocationWhenInUseUsageDescription": "This app uses location to track material movements and site-specific inventory."
       }
     },
     "android": {
@@ -24,7 +30,15 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.gammonmmexpo"
+      "package": "com.gammon.materialmanagement",
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "VIBRATE",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
     },
     "web": {
       "output": "static",

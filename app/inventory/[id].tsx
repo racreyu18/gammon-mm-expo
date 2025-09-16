@@ -19,6 +19,8 @@ import { useOfflineCapable } from '../../hooks/useOffline';
 import { IconSymbol } from '../../components/ui/icon-symbol';
 import { Colors } from '../../constants/theme';
 import { useColorScheme } from '../../hooks/use-color-scheme';
+import { FormValidator, CommonSchemas, InputSanitizer } from '../../utils/inputValidation';
+import { ButtonLoading, useAsyncOperation } from '../../utils/loadingState';
 
 // Configure services
 const inventoryService = new InventoryClient(
@@ -36,6 +38,11 @@ export default function InventoryItemScreen() {
   const [movementType, setMovementType] = useState<'receive' | 'issue' | 'transfer' | 'adjustment'>('issue');
   const [quantity, setQuantity] = useState('');
   const [notes, setNotes] = useState('');
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [fieldTouched, setFieldTouched] = useState<Record<string, boolean>>({});
+  
+  // Use loading state utilities for movement creation
+  const { execute: executeMovementCreation, isLoading: isCreatingMovement } = useAsyncOperation();
 
   // Create movement service with token provider
   const movementService = React.useMemo(() => createMovementClient({
@@ -107,6 +114,8 @@ export default function InventoryItemScreen() {
       setShowMovementModal(false);
       setQuantity('');
       setNotes('');
+      setValidationErrors({});
+      setFieldTouched({});
       Alert.alert(t('success.title'), t('inventory.movement_created'));
     },
     onError: (error: any) => {
@@ -115,8 +124,21 @@ export default function InventoryItemScreen() {
   });
 
   const handleCreateMovement = () => {
-    if (!quantity || isNaN(Number(quantity)) || Number(quantity) <= 0) {
-      Alert.alert(t('errors.title'), t('inventory.invalid_quantity'));
+    // Validate form data
+    const formData = { quantity, notes };
+    const schema = {
+      quantity: CommonSchemas.materialMovement.quantity,
+      notes: { required: false, type: 'string' as const, maxLength: 500 }
+    };
+    
+    const validationResult = FormValidator.validate(formData, schema);
+    
+    if (!validationResult.isValid) {
+      setValidationErrors(validationResult.errors);
+      setFieldTouched({ quantity: true, notes: true });
+      
+      const firstError = Object.values(validationResult.errors)[0];
+      Alert.alert(t('errors.title'), firstError);
       return;
     }
 
@@ -125,12 +147,62 @@ export default function InventoryItemScreen() {
       return;
     }
 
-    createMovementMutation.mutate({
-      itemId: id!,
-      type: movementType,
-      quantity: Number(quantity),
-      notes: notes.trim() || undefined,
+    executeMovementCreation(async () => {
+      await createMovementMutation.mutateAsync({
+        itemId: id!,
+        type: movementType,
+        quantity: Number(quantity),
+        notes: notes.trim() || undefined,
+      });
+    }, {
+      errorMessage: t('errors.network'),
+      onError: (error) => {
+        console.error('Movement creation error:', error);
+        Alert.alert(t('errors.title'), error.message || t('errors.network'));
+      }
     });
+  };
+
+  const handleQuantityChange = (value: string) => {
+    setQuantity(value);
+    
+    // Clear validation error when user starts typing
+    if (validationErrors.quantity) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors.quantity;
+        return newErrors;
+      });
+    }
+  };
+
+  const handleQuantityBlur = () => {
+    setFieldTouched(prev => ({ ...prev, quantity: true }));
+    
+    // Sanitize and validate quantity on blur
+    const sanitizedQuantity = InputSanitizer.sanitizeQuantity(quantity);
+    if (sanitizedQuantity !== null) {
+      setQuantity(sanitizedQuantity.toString());
+    }
+    
+    const result = FormValidator.validate({ quantity }, { quantity: CommonSchemas.materialMovement.quantity });
+    if (!result.isValid && result.errors.quantity) {
+      setValidationErrors(prev => ({ ...prev, quantity: result.errors.quantity }));
+    }
+  };
+
+  const handleNotesChange = (value: string) => {
+    const sanitizedNotes = InputSanitizer.sanitizeString(value);
+    setNotes(sanitizedNotes);
+    
+    // Clear validation error when user starts typing
+    if (validationErrors.notes) {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors.notes;
+        return newErrors;
+      });
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -366,10 +438,10 @@ export default function InventoryItemScreen() {
             </Text>
             <TouchableOpacity
               onPress={handleCreateMovement}
-              disabled={createMovementMutation.isPending}
+              disabled={isCreatingMovement}
             >
               <Text style={[styles.modalSaveText, { color: Colors[colorScheme ?? 'light'].tint }]}>
-                {createMovementMutation.isPending ? t('common.saving') : t('common.save')}
+                {isCreatingMovement ? t('common.saving') : t('common.save')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -382,15 +454,21 @@ export default function InventoryItemScreen() {
               <TextInput
                 style={[styles.textInput, { 
                   color: Colors[colorScheme ?? 'light'].text,
-                  borderColor: Colors[colorScheme ?? 'light'].tabIconDefault
+                  borderColor: (fieldTouched.quantity && validationErrors.quantity) 
+                    ? '#dc3545' 
+                    : Colors[colorScheme ?? 'light'].tabIconDefault
                 }]}
                 value={quantity}
-                onChangeText={setQuantity}
+                onChangeText={handleQuantityChange}
+                onBlur={handleQuantityBlur}
                 placeholder={t('inventory.enter_quantity')}
                 placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
                 keyboardType="numeric"
                 returnKeyType="next"
               />
+              {fieldTouched.quantity && validationErrors.quantity && (
+                <Text style={styles.errorText}>{validationErrors.quantity}</Text>
+              )}
             </View>
 
             <View style={styles.inputGroup}>
@@ -400,16 +478,21 @@ export default function InventoryItemScreen() {
               <TextInput
                 style={[styles.textInput, styles.textArea, { 
                   color: Colors[colorScheme ?? 'light'].text,
-                  borderColor: Colors[colorScheme ?? 'light'].tabIconDefault
+                  borderColor: (fieldTouched.notes && validationErrors.notes) 
+                    ? '#dc3545' 
+                    : Colors[colorScheme ?? 'light'].tabIconDefault
                 }]}
                 value={notes}
-                onChangeText={setNotes}
+                onChangeText={handleNotesChange}
                 placeholder={t('inventory.enter_notes')}
                 placeholderTextColor={Colors[colorScheme ?? 'light'].tabIconDefault}
                 multiline
                 numberOfLines={3}
                 textAlignVertical="top"
               />
+              {fieldTouched.notes && validationErrors.notes && (
+                <Text style={styles.errorText}>{validationErrors.notes}</Text>
+              )}
             </View>
 
             {movementType === 'issue' && item.quantity < Number(quantity || 0) && (
@@ -645,6 +728,11 @@ const styles = StyleSheet.create({
   },
   textArea: {
     height: 80,
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#dc3545',
+    marginTop: 4,
   },
   warningContainer: {
     flexDirection: 'row',
