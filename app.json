@@ -9,9 +9,11 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "description": "Advanced material management system for Gammon construction projects with inventory tracking, movement management, and offline capabilities.",
-    "privacy": "public",
-    "platforms": ["ios", "android", "web"],
-    "keywords": ["material management", "inventory", "construction", "gammon", "tracking"],
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.gammon.materialmanagement",
@@ -32,6 +34,12 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.gammon.materialmanagement",
       "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "VIBRATE",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
         "CAMERA",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
@@ -68,6 +76,12 @@
       "eas": {
         "projectId": "ccf9b5a5-f5bc-451a-9048-224cab32f3ef"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/ccf9b5a5-f5bc-451a-9048-224cab32f3ef"
     }
   }
 }

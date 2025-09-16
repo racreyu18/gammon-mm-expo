@@ -5,7 +5,6 @@ import {
   Text, 
   FlatList, 
   TouchableOpacity, 
-  ActivityIndicator,
   RefreshControl,
   Alert 
 } from 'react-native';
@@ -15,6 +14,9 @@ import { router } from 'expo-router';
 
 import { apiService } from '../../services/api';
 import { useAuth } from '../../providers/AuthProvider';
+import { useOfflineCapability } from '../../hooks/useOffline';
+import { CompactOfflineIndicator } from '../../components/OfflineIndicator';
+import { LoadingIndicator } from '../../utils/loadingState';
 import { Notification } from '../../services/api';
 import { useNotificationUpdates } from '../../hooks/useListUpdates';
 import { useAppStateRefresh } from '../../hooks/useAppStateRefresh';
@@ -135,8 +137,12 @@ export default function NotificationsScreen() {
   if (notificationsQuery.isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3B82F6" />
-        <Text style={styles.loadingText}>Loading notifications...</Text>
+        <LoadingIndicator 
+          state="loading"
+          message="Loading notifications..."
+          size="large"
+          color="#3B82F6"
+        />
       </View>
     );
   }

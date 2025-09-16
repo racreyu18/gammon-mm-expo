@@ -1,10 +1,11 @@
 import React from 'react';
-import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { useAuth } from '../providers/AuthProvider';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 import { Colors } from '../constants/theme';
 import { useColorScheme } from '../hooks/use-color-scheme';
+import { LoadingIndicator } from '../utils/loadingState';
 import LoginScreen from './LoginScreen';
 
 interface AuthGuardProps {
@@ -19,13 +20,14 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children, fallback }) => {
   if (isLoading) {
     return (
       <ThemedView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator 
-            size="large" 
-            color={Colors[colorScheme ?? 'light'].tint} 
-          />
-          <ThemedText style={styles.loadingText}>Checking authentication...</ThemedText>
-        </View>
+        <LoadingIndicator 
+          state="loading"
+          message="Checking authentication..."
+          size="large"
+          color={Colors[colorScheme ?? 'light'].tint}
+          style={styles.loadingContainer}
+          textStyle={styles.loadingText}
+        />
       </ThemedView>
     );
   }

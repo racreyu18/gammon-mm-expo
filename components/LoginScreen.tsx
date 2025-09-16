@@ -7,6 +7,7 @@ import { Colors } from '../constants/theme';
 import { useColorScheme } from '../hooks/use-color-scheme';
 import { IconSymbol } from './ui/icon-symbol';
 import { useTranslation } from 'react-i18next';
+import { ButtonLoading } from '../utils/loadingState';
 
 const { width } = Dimensions.get('window');
 
@@ -60,21 +61,20 @@ export const LoginScreen: React.FC = () => {
           </ThemedText>
 
           {/* Microsoft Login Button */}
-          <TouchableOpacity
-            style={[styles.loginButton, { opacity: isLoggingIn ? 0.7 : 1 }]}
+          <ButtonLoading
+            isLoading={isLoggingIn}
             onPress={handleLogin}
-            disabled={isLoggingIn}
+            style={styles.loginButton}
+            loadingText={t('login.signingIn', 'Signing in...')}
+            loadingColor="white"
           >
             <View style={styles.microsoftLogo}>
               <IconSymbol name="microsoft.logo" size={24} color="white" />
             </View>
             <ThemedText style={styles.loginButtonText}>
-              {isLoggingIn 
-                ? t('login.signingIn', 'Signing in...') 
-                : t('login.signInMicrosoft', 'Sign in with Microsoft')
-              }
+              {t('login.signInMicrosoft', 'Sign in with Microsoft')}
             </ThemedText>
-          </TouchableOpacity>
+          </ButtonLoading>
 
           {/* Guest Mode Button */}
           <TouchableOpacity

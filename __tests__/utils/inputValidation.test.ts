@@ -1,9 +1,14 @@
 import { describe, it, expect } from '@jest/globals';
 import {
   ValidationPatterns,
-  InputSanitizer,
-  InputValidator,
+  sanitizeInput,
+  sanitizeEmail,
+  sanitizeNumeric,
+  ValidationError,
   FormValidator,
+  BarcodeValidator,
+  MaterialMovementValidator,
+  UserProfileValidator,
   CommonSchemas
 } from '../../utils/inputValidation';
 
@@ -19,148 +24,140 @@ describe('ValidationPatterns', () => {
       expect(ValidationPatterns.email.test('invalid-email')).toBe(false);
       expect(ValidationPatterns.email.test('@domain.com')).toBe(false);
       expect(ValidationPatterns.email.test('user@')).toBe(false);
-      expect(ValidationPatterns.email.test('user..name@domain.com')).toBe(true); // simple regex allows consecutive dots
+      expect(ValidationPatterns.email.test('user..name@domain.com')).toBe(false);
     });
   });
 
   describe('barcode validation', () => {
     it('should validate correct barcode formats', () => {
-      expect(ValidationPatterns.barcode.test('ABC123')).toBe(true);
-      expect(ValidationPatterns.barcode.test('123-456')).toBe(true);
-      expect(ValidationPatterns.barcode.test('PROD-001')).toBe(true);
+      expect(ValidationPatterns.barcode.test('1234567890123')).toBe(true); // 13 digits
+      expect(ValidationPatterns.barcode.test('123456789012')).toBe(true); // 12 digits
+      expect(ValidationPatterns.barcode.test('12345678')).toBe(true); // 8 digits
     });
 
     it('should reject invalid barcode formats', () => {
-      expect(ValidationPatterns.barcode.test('abc 123')).toBe(false); // spaces
-      expect(ValidationPatterns.barcode.test('ABC@123')).toBe(false); // special chars
-      expect(ValidationPatterns.barcode.test('')).toBe(false); // empty string doesn't match
+      expect(ValidationPatterns.barcode.test('1234567')).toBe(false); // too short
+      expect(ValidationPatterns.barcode.test('12345678901234')).toBe(false); // too long
+      expect(ValidationPatterns.barcode.test('ABC123456789')).toBe(false); // contains letters
+      expect(ValidationPatterns.barcode.test('')).toBe(false); // empty
     });
   });
 
   describe('material code validation', () => {
     it('should validate correct material codes', () => {
-      expect(ValidationPatterns.materialCode.test('MAT001')).toBe(true);
-      expect(ValidationPatterns.materialCode.test('STEEL-BEAM')).toBe(true);
-      expect(ValidationPatterns.materialCode.test('CONCRETE_MIX')).toBe(true);
+      expect(ValidationPatterns.materialCode.test('MAT-001')).toBe(true);
+      expect(ValidationPatterns.materialCode.test('STEEL_BEAM_001')).toBe(true);
+      expect(ValidationPatterns.materialCode.test('CONCRETE-MIX-123')).toBe(true);
     });
 
     it('should reject invalid material codes', () => {
+      expect(ValidationPatterns.materialCode.test('mat@001')).toBe(false); // special chars
       expect(ValidationPatterns.materialCode.test('MAT 001')).toBe(false); // spaces
-      expect(ValidationPatterns.materialCode.test('')).toBe(false); // empty string doesn't match
-      expect(ValidationPatterns.materialCode.test('A')).toBe(true); // single character is valid
+      expect(ValidationPatterns.materialCode.test('')).toBe(false); // empty
+      expect(ValidationPatterns.materialCode.test('A')).toBe(false); // too short
     });
   });
 });
 
-describe('InputSanitizer', () => {
-  describe('sanitizeString', () => {
+describe('Sanitization Functions', () => {
+  describe('sanitizeInput', () => {
     it('should remove dangerous characters', () => {
-      expect(InputSanitizer.sanitizeString('<script>alert("xss")</script>')).toBe('');
-      expect(InputSanitizer.sanitizeString('Normal text')).toBe('Normal text');
-      expect(InputSanitizer.sanitizeString('Text with "quotes" and \'apostrophes\'')).toBe('Text with &quot;quotes&quot; and &#x27;apostrophes&#x27;');
+      expect(sanitizeInput('<script>alert("xss")</script>')).toBe('scriptalert("xss")/script');
+      expect(sanitizeInput('SELECT * FROM users;')).toBe('SELECT * FROM users;');
+      expect(sanitizeInput('Normal text 123')).toBe('Normal text 123');
+    });
+
+    it('should trim whitespace', () => {
+      expect(sanitizeInput('  test  ')).toBe('test');
+      expect(sanitizeInput('\n\ttest\n\t')).toBe('test');
     });
 
     it('should handle empty and null inputs', () => {
-      expect(InputSanitizer.sanitizeString('')).toBe('');
-      expect(InputSanitizer.sanitizeString(null as any)).toBe('');
-      expect(InputSanitizer.sanitizeString(undefined as any)).toBe('');
+      expect(sanitizeInput('')).toBe('');
+      expect(sanitizeInput('   ')).toBe('');
     });
   });
 
-  describe('sanitizeBarcode', () => {
-    it('should normalize barcode values', () => {
-      expect(InputSanitizer.sanitizeBarcode('  ABC123  ')).toBe('ABC123');
-      expect(InputSanitizer.sanitizeBarcode('test-barcode')).toBe('TEST-BARCODE');
+  describe('sanitizeEmail', () => {
+    it('should normalize email addresses', () => {
+      expect(sanitizeEmail('  USER@EXAMPLE.COM  ')).toBe('user@example.com');
+      expect(sanitizeEmail('Test.Email@Domain.Org')).toBe('test.email@domain.org');
     });
 
-    it('should handle empty inputs', () => {
-      expect(InputSanitizer.sanitizeBarcode('')).toBe('');
+    it('should handle invalid emails', () => {
+      expect(sanitizeEmail('invalid-email')).toBe('invalid-email');
+      expect(sanitizeEmail('')).toBe('');
     });
   });
 
-  describe('sanitizeNumber', () => {
+  describe('sanitizeNumeric', () => {
     it('should extract numeric values', () => {
-      expect(InputSanitizer.sanitizeNumber('123.45')).toBe(123.45);
-      expect(InputSanitizer.sanitizeNumber('$1,234.56')).toBe(1234.56);
-      expect(InputSanitizer.sanitizeNumber('Price: $99.99')).toBe(99.99);
+      expect(sanitizeNumeric('123.45')).toBe('123.45');
+      expect(sanitizeNumeric('$1,234.56')).toBe('1234.56');
+      expect(sanitizeNumeric('Price: $99.99')).toBe('99.99');
     });
 
     it('should handle non-numeric inputs', () => {
-      expect(InputSanitizer.sanitizeNumber('abc')).toBe(null);
-      expect(InputSanitizer.sanitizeNumber('')).toBe(null);
+      expect(sanitizeNumeric('abc')).toBe('');
+      expect(sanitizeNumeric('')).toBe('');
     });
   });
 });
 
 describe('FormValidator', () => {
+  let validator: FormValidator;
+
+  beforeEach(() => {
+    validator = new FormValidator();
+  });
+
   it('should validate required fields', () => {
-    const schema = {
-      name: { required: true }
-    };
+    validator.required('name', '');
+    expect(validator.hasErrors()).toBe(true);
+    expect(validator.getErrors()).toHaveProperty('name');
 
-    let result = FormValidator.validate({ name: '' }, schema);
-    expect(result.isValid).toBe(false);
-    expect(result.errors.name).toBe('name is required');
-
-    result = FormValidator.validate({ name: 'John Doe' }, schema);
-    expect(result.isValid).toBe(true);
-    expect(result.errors.name).toBeUndefined();
+    validator.clearErrors();
+    validator.required('name', 'John Doe');
+    expect(validator.hasErrors()).toBe(false);
   });
 
   it('should validate email fields', () => {
-    const schema = {
-      email: { required: true, pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/ }
-    };
+    validator.email('email', 'invalid-email');
+    expect(validator.hasErrors()).toBe(true);
+    expect(validator.getErrors().email).toContain('Invalid email format');
 
-    let result = FormValidator.validate({ email: 'invalid-email' }, schema);
-    expect(result.isValid).toBe(false);
-    expect(result.errors.email).toBe('email format is invalid');
-
-    result = FormValidator.validate({ email: 'user@example.com' }, schema);
-    expect(result.isValid).toBe(true);
-    expect(result.errors.email).toBeUndefined();
+    validator.clearErrors();
+    validator.email('email', 'user@example.com');
+    expect(validator.hasErrors()).toBe(false);
   });
 
   it('should validate minimum length', () => {
-    const schema = {
-      password: { required: true, minLength: 8 }
-    };
+    validator.minLength('password', 'abc', 8);
+    expect(validator.hasErrors()).toBe(true);
+    expect(validator.getErrors().password).toContain('Must be at least 8 characters');
 
-    let result = FormValidator.validate({ password: 'abc' }, schema);
-    expect(result.isValid).toBe(false);
-    expect(result.errors.password).toBe('password must be at least 8 characters');
-
-    result = FormValidator.validate({ password: 'password123' }, schema);
-    expect(result.isValid).toBe(true);
-    expect(result.errors.password).toBeUndefined();
+    validator.clearErrors();
+    validator.minLength('password', 'password123', 8);
+    expect(validator.hasErrors()).toBe(false);
   });
 
   it('should validate numeric fields', () => {
-    const schema = {
-      quantity: { required: true, pattern: /^\d+(\.\d+)?$/ }
-    };
+    validator.numeric('quantity', 'abc');
+    expect(validator.hasErrors()).toBe(true);
+    expect(validator.getErrors().quantity).toContain('Must be a valid number');
 
-    let result = FormValidator.validate({ quantity: 'abc' }, schema);
-    expect(result.isValid).toBe(false);
-    expect(result.errors.quantity).toBe('quantity format is invalid');
-
-    result = FormValidator.validate({ quantity: '123.45' }, schema);
-    expect(result.isValid).toBe(true);
-    expect(result.errors.quantity).toBeUndefined();
+    validator.clearErrors();
+    validator.numeric('quantity', '123.45');
+    expect(validator.hasErrors()).toBe(false);
   });
 
   it('should validate custom patterns', () => {
-    const schema = {
-      code: { required: true, pattern: /^[A-Z]{3}-\d{3}$/ }
-    };
+    validator.pattern('code', 'invalid', /^[A-Z]{3}-\d{3}$/, 'Must match format ABC-123');
+    expect(validator.hasErrors()).toBe(true);
 
-    let result = FormValidator.validate({ code: 'invalid' }, schema);
-    expect(result.isValid).toBe(false);
-    expect(result.errors.code).toBe('code format is invalid');
-
-    result = FormValidator.validate({ code: 'ABC-123' }, schema);
-    expect(result.isValid).toBe(true);
-    expect(result.errors.code).toBeUndefined();
+    validator.clearErrors();
+    validator.pattern('code', 'ABC-123', /^[A-Z]{3}-\d{3}$/, 'Must match format ABC-123');
+    expect(validator.hasErrors()).toBe(false);
   });
 });
 

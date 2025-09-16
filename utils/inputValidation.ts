@@ -76,7 +76,7 @@ export class InputSanitizer {
    * Sanitize quantity input (positive numbers with up to 2 decimal places)
    */
   static sanitizeQuantity(input: string | number): number | null {
-    const num = InputSanitizer.sanitizeNumber(input);
+    const num = this.sanitizeNumber(input);
     if (num === null || num < 0) return null;
     return Math.round(num * 100) / 100; // Round to 2 decimal places
   }
