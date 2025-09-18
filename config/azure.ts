@@ -11,14 +11,9 @@ export interface AzureConfig {
 
 const getRedirectUri = (): string => {
   if (Platform.OS === 'web') {
-    // Check if we're in a browser environment
-    if (typeof window !== 'undefined' && window.location) {
-      return `${window.location.origin}/auth`;
-    }
-    // Fallback for server-side rendering or when window is not available
     return 'http://localhost:8081/auth';
   }
-  return Constants.expoConfig?.scheme ? `${Constants.expoConfig.scheme}://auth` : 'exp://localhost:8081/--/auth';
+  return 'gammonmmexpo://auth';
 };
 
 export const azureConfig: AzureConfig = {
