@@ -18,7 +18,21 @@ export function validateMovement(m: Partial<MovementTransaction>): ValidationRes
 	return buildResult(issues);
 }
 
-// AttachmentConstraints and validateAttachment moved to attachmentHandler.ts to avoid circular dependency
+export interface AttachmentConstraints { maxSizeBytes: number; allowedMimeTypes: string[]; }
+
+export function validateAttachment(a: Partial<AttachmentMeta>, constraints: AttachmentConstraints): ValidationResult {
+	const issues: ValidationIssue[] = [];
+	if (!a.filename) issues.push({ field: 'filename', message: 'filename required' });
+	if (!a.mimeType) issues.push({ field: 'mimeType', message: 'mimeType required' });
+	if (a.sizeBytes == null) issues.push({ field: 'sizeBytes', message: 'sizeBytes required' });
+	if (a.sizeBytes != null && a.sizeBytes > constraints.maxSizeBytes) {
+		issues.push({ field: 'sizeBytes', message: `exceeds max ${constraints.maxSizeBytes}` });
+	}
+	if (a.mimeType && !constraints.allowedMimeTypes.includes(a.mimeType)) {
+		issues.push({ field: 'mimeType', message: 'mimeType not allowed' });
+	}
+	return buildResult(issues);
+}
 
 export function assertValid(result: ValidationResult): void {
 	if (!result.valid) {

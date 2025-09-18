@@ -1,5 +1,5 @@
 import { useState, useEffect, createContext, useContext } from 'react';
-import authService, { AuthState, UserProfile, UserSecurity } from '../services/authService';
+import authService, { AuthState, UserProfile, UserSecurity, ApiLoginCredentials, ApiLoginResponse } from '../services/authService';
 
 // Ensure authService is properly initialized
 if (!authService) {
@@ -8,6 +8,8 @@ if (!authService) {
 
 interface AuthContextType extends AuthState {
   login: () => Promise<void>;
+  apiLogin: (credentials: ApiLoginCredentials) => Promise<ApiLoginResponse>;
+  signIn: () => Promise<string | null>;
   logout: () => Promise<void>;
   hasRole: (roleName: string) => Promise<boolean>;
   hasFunction: (functionName: string) => Promise<boolean>;
@@ -24,7 +26,8 @@ export function useAuth(): AuthContextType {
     isAuthenticated: false,
     tokens: null,
     userSecurity: null,
-    error: null
+    error: null,
+    authMethod: null
   });
 
   useEffect(() => {
@@ -53,6 +56,24 @@ export function useAuth(): AuthContextType {
       await authService.login();
     } catch (error) {
       console.error('Login failed:', error);
+      throw error;
+    }
+  };
+
+  const apiLogin = async (credentials: ApiLoginCredentials): Promise<ApiLoginResponse> => {
+    try {
+      return await authService.apiLogin(credentials);
+    } catch (error) {
+      console.error('API login failed:', error);
+      throw error;
+    }
+  };
+
+  const signIn = async (): Promise<string | null> => {
+    try {
+      return await authService.signIn();
+    } catch (error) {
+      console.error('Sign in failed:', error);
       throw error;
     }
   };
@@ -86,6 +107,8 @@ export function useAuth(): AuthContextType {
   return {
     ...authState,
     login,
+    apiLogin,
+    signIn,
     logout,
     hasRole,
     hasFunction,

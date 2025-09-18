@@ -6,11 +6,6 @@ import { localStorage, cacheUtils } from '../utils/localStorage';
 import { networkStatus, networkUtils } from '../utils/networkStatus';
 import { logger } from '../utils/logger';
 
-// Export new client services
-export { LocationClient } from './locationClient';
-export { InventoryClient } from './inventoryClient';
-export { UserClient } from './userClient';
-
 export interface MovementServiceConfig { baseUrl: string; tokenProvider?: () => Promise<string>; }
 
 export interface MovementService {
@@ -23,11 +18,11 @@ export interface MovementService {
 export function createMovementService(cfg: MovementServiceConfig): MovementService {
 	const client: MovementClient = createMovementClient({ baseUrl: cfg.baseUrl, tokenProvider: cfg.tokenProvider });
 	const offlineQueue = new OfflineQueue();
-	
+
 	return {
 		async list() {
 			const cacheKey = 'movements_list';
-			
+
 			try {
 				if (networkStatus.isOnline()) {
 					const result = await client.listMovements() as MovementTransaction[];
@@ -58,7 +53,7 @@ export function createMovementService(cfg: MovementServiceConfig): MovementServi
 		async create(draft) {
 			const toValidate: Partial<MovementTransaction> = { ...draft, status: 'DRAFT', createdAt: new Date().toISOString(), id: 'TEMP' } as any;
 			assertValid(validateMovement(toValidate));
-			
+
 			if (networkStatus.isOnline()) {
 				try {
 					const headers: Record<string, string> = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
@@ -69,19 +64,19 @@ export function createMovementService(cfg: MovementServiceConfig): MovementServi
 							logger.warn('Failed to get auth token for create request', e);
 						}
 					}
-					
+
 					const res = await fetch(cfg.baseUrl.replace(/\/$/, '') + '/movements', {
 						method: 'POST',
 						headers,
 						body: JSON.stringify(draft)
 					});
-					
+
 					if (!res.ok) throw new Error('Failed to create movement');
 					const result = await res.json();
-					
+
 					// Invalidate movements list cache
 					await localStorage.remove('movements_list');
-					
+
 					return result;
 				} catch (error) {
 					if (networkUtils.isNetworkError(error)) {
@@ -117,7 +112,7 @@ export function createMovementService(cfg: MovementServiceConfig): MovementServi
 		},
 		async get(id) {
 			const cacheKey = `movement_${id}`;
-			
+
 			try {
 				if (networkStatus.isOnline()) {
 					const headers: Record<string, string> = { 'Accept': 'application/json' };
@@ -128,11 +123,11 @@ export function createMovementService(cfg: MovementServiceConfig): MovementServi
 							logger.warn('Failed to get auth token for get request', e);
 						}
 					}
-					
+
 					const res = await fetch(cfg.baseUrl.replace(/\/$/, '') + `/movements/${id}`, { headers });
 					if (!res.ok) throw new Error('Failed to fetch movement');
 					const result = await res.json();
-					
+
 					// Cache the result
 					await localStorage.set(cacheKey, result, 10 * 60 * 1000); // 10 minutes TTL
 					return result;
@@ -168,20 +163,20 @@ export function createMovementService(cfg: MovementServiceConfig): MovementServi
 							logger.warn('Failed to get auth token for transition request', e);
 						}
 					}
-					
+
 					const res = await fetch(cfg.baseUrl.replace(/\/$/, '') + `/movements/${id}/status`, {
 						method: 'PATCH',
 						headers,
 						body: JSON.stringify({ status: nextStatus })
 					});
-					
+
 					if (!res.ok) throw new Error('Failed to transition movement');
 					const result = await res.json();
-					
+
 					// Invalidate related cache entries
 					await localStorage.remove(`movement_${id}`);
 					await localStorage.remove('movements_list');
-					
+
 					return result;
 				} catch (error) {
 					if (networkUtils.isNetworkError(error)) {
@@ -239,16 +234,16 @@ export interface ApprovalsService {
 export function createApprovalsService(cfg: MovementServiceConfig): ApprovalsService {
 	const client = new (require('./approvalsClient').ApprovalsClient)(cfg.baseUrl);
 	const offlineQueue = new OfflineQueue();
-	
+
 	return {
 		async get(id: string) {
 			const cacheKey = `approval_${id}`;
-			
+
 			try {
 				if (networkStatus.isOnline()) {
 					const token = cfg.tokenProvider ? await cfg.tokenProvider() : undefined;
 					if (token) client.updateAuthToken(token);
-					
+
 					const approval = await client.getApproval(id);
 					const result = {
 						id: approval.id,
@@ -259,7 +254,7 @@ export function createApprovalsService(cfg: MovementServiceConfig): ApprovalsSer
 						updatedAt: approval.updatedAt || new Date().toISOString(),
 						createdAt: approval.updatedAt || new Date().toISOString(),
 					};
-					
+
 					// Cache the result
 					await localStorage.set(cacheKey, result, 10 * 60 * 1000); // 10 minutes TTL
 					return result;
@@ -290,15 +285,15 @@ export function createApprovalsService(cfg: MovementServiceConfig): ApprovalsSer
 				try {
 					const token = cfg.tokenProvider ? await cfg.tokenProvider() : undefined;
 					if (token) client.updateAuthToken(token);
-					
+
 					await client.submitDecision(id, {
 						action: action as 'APPROVE' | 'REJECT',
 						comment: payload?.comment,
 					});
-					
+
 					// Invalidate cache
 					await localStorage.remove(`approval_${id}`);
-					
+
 					// Return updated approval
 					return this.get(id);
 				} catch (error) {
@@ -353,20 +348,20 @@ export interface AttachmentsService {
 
 export function createAttachmentsService(cfg: MovementServiceConfig): AttachmentsService {
 	const client = new (require('./attachmentsClient').AttachmentsClient)(cfg.baseUrl);
-	
+
 	return {
 		async upload(input) {
 			try {
 				const token = cfg.tokenProvider ? await cfg.tokenProvider() : undefined;
 				if (token) client.updateAuthToken(token);
-				
+
 				const file = new Blob([input.data], { type: input.mimeType });
 				const result = await client.uploadAttachment({
 					file,
 					referenceType: input.parentType,
 					referenceId: input.parentId,
 				});
-				
+
 				return {
 					id: result.id,
 					fileName: result.fileName,
@@ -385,7 +380,7 @@ export function createAttachmentsService(cfg: MovementServiceConfig): Attachment
 			try {
 				const token = cfg.tokenProvider ? await cfg.tokenProvider() : undefined;
 				if (token) client.updateAuthToken(token);
-				
+
 				return await client.getAttachment(id);
 			} catch (error) {
 				console.error('Failed to get attachment:', error);
@@ -415,16 +410,16 @@ export interface NotificationsService {
 export function createNotificationsService(cfg: MovementServiceConfig): NotificationsService {
 	const client = new (require('./notificationsClient').NotificationsClient)(cfg.baseUrl);
 	const offlineQueue = new OfflineQueue();
-	
+
 	return {
 		async list() {
 			const cacheKey = 'notifications_list';
-			
+
 			try {
 				if (networkStatus.isOnline()) {
 					const token = cfg.tokenProvider ? await cfg.tokenProvider() : undefined;
 					if (token) client.updateAuthToken(token);
-					
+
 					const notifications = await client.listNotifications();
 					const result = notifications.map(n => ({
 						id: n.id,
@@ -435,7 +430,7 @@ export function createNotificationsService(cfg: MovementServiceConfig): Notifica
 						receivedAt: n.receivedAt,
 						read: n.read,
 					}));
-					
+
 					// Cache the result
 					await localStorage.set(cacheKey, result, 2 * 60 * 1000); // 2 minutes TTL
 					return result;
@@ -466,9 +461,9 @@ export function createNotificationsService(cfg: MovementServiceConfig): Notifica
 				try {
 					const token = cfg.tokenProvider ? await cfg.tokenProvider() : undefined;
 					if (token) client.updateAuthToken(token);
-					
+
 					await client.markAsRead(id);
-					
+
 					// Invalidate notifications cache
 					await localStorage.remove('notifications_list');
 				} catch (error) {

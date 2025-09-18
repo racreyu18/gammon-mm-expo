@@ -31,7 +31,7 @@ function num(val: string | undefined, fallback: number): number {
 }
 
 export const runtimeConfig: AppRuntimeConfig = Object.freeze({
-  apiBaseUrl: process.env.API_BASE_URL || 'http://localhost:7060/api',
+  apiBaseUrl: process.env.API_BASE_URL || 'http://localhost:3000',
   env: process.env.APP_ENV || 'DEV',
   feature: {
     approvals: bool(process.env.FEATURE_APPROVALS, true),

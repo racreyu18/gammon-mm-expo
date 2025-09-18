@@ -35,6 +35,19 @@ export interface AuthState {
   userSecurity: UserSecurity | null;
   isLoading: boolean;
   error: string | null;
+  authMethod: 'api' | 'entra' | null;
+}
+
+export interface ApiLoginCredentials {
+  username: string;
+  password: string;
+  domain: string;
+}
+
+export interface ApiLoginResponse {
+  success: boolean;
+  token?: string;
+  error?: string;
 }
 
 class AuthService {
@@ -42,7 +55,9 @@ class AuthService {
   private tokens: AuthTokens | null = null;
   private userProfile: UserProfile | null = null;
   private userSecurity: UserSecurity | null = null;
+  private authMethod: 'api' | 'entra' | null = null;
   private authStateListeners: ((state: AuthState) => void)[] = [];
+  private isInitializing: boolean = false;
 
   private constructor() {}
 
@@ -77,7 +92,8 @@ class AuthService {
       tokens: this.tokens,
       userSecurity: this.userSecurity,
       isLoading: false,
-      error: null
+      error: null,
+      authMethod: this.authMethod
     };
   }
 
@@ -85,6 +101,32 @@ class AuthService {
   private notifyStateChange(): void {
     const state = this.getAuthState();
     this.authStateListeners.forEach(callback => callback(state));
+  }
+
+  // Clear auth data without triggering logout flow
+  private async clearAuthData(): Promise<void> {
+    try {
+      // Clear stored data
+      if (Platform.OS === 'web') {
+        localStorage.removeItem('auth_tokens');
+        localStorage.removeItem('user_profile');
+        localStorage.removeItem('user_security');
+        localStorage.removeItem('auth_method');
+      } else {
+        await SecureStore.deleteItemAsync('auth_tokens');
+        await SecureStore.deleteItemAsync('user_profile');
+        await SecureStore.deleteItemAsync('user_security');
+        await SecureStore.deleteItemAsync('auth_method');
+      }
+      
+      // Clear in-memory data
+      this.tokens = null;
+      this.userProfile = null;
+      this.userSecurity = null;
+      this.authMethod = null;
+    } catch (error) {
+      console.error('Error clearing auth data:', error);
+    }
   }
 
   // Generate PKCE challenge
@@ -249,6 +291,10 @@ class AuthService {
       this.tokens = tokens;
       this.userProfile = userProfile;
       this.userSecurity = userSecurity;
+      this.authMethod = 'entra';
+
+      // Store auth method
+      await this.storeAuthMethod('entra');
 
       this.notifyStateChange();
 
@@ -257,6 +303,251 @@ class AuthService {
       console.error('Login error:', error);
       this.notifyStateChange();
       throw error;
+    }
+  }
+
+  // API Authentication Methods
+  public async apiLogin(credentials: ApiLoginCredentials): Promise<ApiLoginResponse> {
+    try {
+      this.notifyStateChange(); // Set loading state
+
+      // Construct API endpoint based on domain
+      const apiEndpoint = `${credentials.domain}/api/auth/login`;
+      
+      const loginData = {
+        username: credentials.username,
+        password: credentials.password
+      };
+
+      const response = await fetch(apiEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(loginData)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const token = result.access_token || result.token;
+        
+        if (token) {
+          // Create tokens object for API authentication
+          const apiTokens: AuthTokens = {
+            accessToken: token,
+            refreshToken: result.refresh_token || '',
+            idToken: '',
+            expiresAt: this.getTokenExpiration(token)
+          };
+
+          // Store API token and auth method
+          await this.storeTokens(apiTokens);
+          await SecureStore.setItemAsync('auth_method', 'api');
+          await SecureStore.setItemAsync('api_domain', credentials.domain);
+          
+          // Get user profile from API token
+          const userProfile = await this.getUserProfileFromApiToken(token);
+          const userSecurity = await this.getUserSecurity(token);
+
+          await this.storeUserProfile(userProfile);
+          await this.storeUserSecurity(userSecurity);
+
+          this.tokens = apiTokens;
+          this.userProfile = userProfile;
+          this.userSecurity = userSecurity;
+          this.authMethod = 'api';
+          
+          // Store auth method
+          await this.storeAuthMethod('api');
+          
+          this.notifyStateChange();
+          
+          return { success: true, token: token };
+        } else {
+          this.notifyStateChange();
+          return { success: false, error: 'No token received from server' };
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({ message: 'Authentication failed' }));
+        this.notifyStateChange();
+        return { success: false, error: errorData.message || 'Authentication failed' };
+      }
+    } catch (error) {
+      console.error('API Login Error:', error);
+      this.notifyStateChange();
+      return { success: false, error: 'Network error or server unavailable' };
+    }
+  }
+
+  // Validate API token
+  private validateApiToken(token: string): boolean {
+    if (!token) return false;
+    
+    try {
+      // Basic token validation - check if it's a valid JWT
+      const parts = token.split('.');
+      if (parts.length !== 3) return false;
+      
+      // Decode payload to check expiration
+      const payload = JSON.parse(atob(parts[1]));
+      const currentTime = Math.floor(Date.now() / 1000);
+      
+      return payload.exp > currentTime;
+    } catch (error) {
+      console.error('Token validation error:', error);
+      return false;
+    }
+  }
+
+  // Get authentication method
+  public async getAuthMethod(): Promise<'api' | 'entra' | null> {
+    try {
+      if (Platform.OS === 'web') {
+        const method = localStorage.getItem('auth_method');
+        return method as 'api' | 'entra' | null;
+      } else {
+        const method = await SecureStore.getItemAsync('auth_method');
+        return method as 'api' | 'entra' | null;
+      }
+    } catch (error) {
+      console.error('Error getting auth method:', error);
+      return null;
+    }
+  }
+
+  private async storeAuthMethod(method: 'api' | 'entra'): Promise<void> {
+    try {
+      if (Platform.OS === 'web') {
+        localStorage.setItem('auth_method', method);
+      } else {
+        await SecureStore.setItemAsync('auth_method', method);
+      }
+    } catch (error) {
+      console.error('Error storing auth method:', error);
+    }
+  }
+
+  // Refresh API token
+  private async refreshApiToken(): Promise<string | null> {
+    try {
+      const domain = await SecureStore.getItemAsync('api_domain');
+      const refreshToken = this.tokens?.refreshToken;
+      
+      if (!domain || !refreshToken) return null;
+      
+      const response = await fetch(`${domain}/api/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${refreshToken}`
+        }
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        const newToken = result.access_token || result.token;
+        
+        if (newToken) {
+          // Update stored tokens
+          const updatedTokens: AuthTokens = {
+            ...this.tokens!,
+            accessToken: newToken,
+            expiresAt: this.getTokenExpiration(newToken)
+          };
+          
+          await this.storeTokens(updatedTokens);
+          this.tokens = updatedTokens;
+          
+          return newToken;
+        }
+      }
+    } catch (error) {
+      console.error('Token refresh error:', error);
+    }
+    
+    return null;
+  }
+
+  // Get token expiration from JWT
+  private getTokenExpiration(token: string): number {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.exp * 1000; // Convert to milliseconds
+    } catch (error) {
+      console.error('Error parsing token expiration:', error);
+      return Date.now() + (60 * 60 * 1000); // Default to 1 hour from now
+    }
+  }
+
+  // Get user profile from API token
+  private async getUserProfileFromApiToken(token: string): Promise<UserProfile> {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      
+      return {
+        id: payload.sub || payload.user_id || payload.id || 'unknown',
+        email: payload.email || payload.preferred_username || 'unknown@example.com',
+        name: payload.name || payload.given_name || payload.username || 'Unknown User',
+        givenName: payload.given_name,
+        familyName: payload.family_name,
+        userPrincipalName: payload.upn || payload.email,
+        jobTitle: payload.job_title,
+        department: payload.department
+      };
+    } catch (error) {
+      console.error('Error parsing user profile from token:', error);
+      return {
+        id: 'unknown',
+        email: 'unknown@example.com',
+        name: 'Unknown User'
+      };
+    }
+  }
+
+  // Enhanced sign in method that supports both authentication types
+  public async signIn(): Promise<string | null> {
+    try {
+      const authMethod = await this.getAuthMethod();
+      const storedTokens = await this.getStoredTokens();
+      
+      if (authMethod === 'api') {
+        // API Authentication
+        if (storedTokens && this.validateApiToken(storedTokens.accessToken)) {
+          this.tokens = storedTokens;
+          this.userProfile = await this.getStoredUserProfile();
+          this.userSecurity = await this.getStoredUserSecurity();
+          this.authMethod = 'api';
+          this.notifyStateChange();
+          return storedTokens.accessToken;
+        } else {
+          // Try to refresh API token
+          const refreshedToken = await this.refreshApiToken();
+          if (refreshedToken) {
+            this.userProfile = await this.getStoredUserProfile();
+            this.userSecurity = await this.getStoredUserSecurity();
+            this.authMethod = 'api';
+            this.notifyStateChange();
+            return refreshedToken;
+          } else {
+            return null;
+          }
+        }
+      } else {
+        // Entra ID Authentication (default)
+        if (storedTokens && await this.validateTokens(storedTokens)) {
+          this.tokens = storedTokens;
+          this.userProfile = await this.getStoredUserProfile();
+          this.userSecurity = await this.getStoredUserSecurity();
+          this.authMethod = 'entra';
+          this.notifyStateChange();
+          return storedTokens.accessToken;
+        } else {
+          return null;
+        }
+      }
+    } catch (error) {
+      console.error('Sign in error:', error);
+      return null;
     }
   }
 
@@ -416,14 +707,23 @@ class AuthService {
   public async logout(): Promise<void> {
     try {
       // Clear stored data
-      await SecureStore.deleteItemAsync('auth_tokens');
-      await SecureStore.deleteItemAsync('user_profile');
-      await SecureStore.deleteItemAsync('user_security');
+      if (Platform.OS === 'web') {
+        localStorage.removeItem('auth_tokens');
+        localStorage.removeItem('user_profile');
+        localStorage.removeItem('user_security');
+        localStorage.removeItem('auth_method');
+      } else {
+        await SecureStore.deleteItemAsync('auth_tokens');
+        await SecureStore.deleteItemAsync('user_profile');
+        await SecureStore.deleteItemAsync('user_security');
+        await SecureStore.deleteItemAsync('auth_method');
+      }
       
       // Clear in-memory data
       this.tokens = null;
       this.userProfile = null;
       this.userSecurity = null;
+      this.authMethod = null;
 
       this.notifyStateChange();
     } catch (error) {
@@ -517,14 +817,25 @@ class AuthService {
 
   // Initialize auth state from stored data
   public async initializeAuth(): Promise<void> {
+    // Prevent infinite recursion
+    if (this.isInitializing) {
+      return;
+    }
+    
+    this.isInitializing = true;
+    
     try {
-      const [storedTokens, storedProfile, storedSecurity] = await Promise.all([
+      const [storedTokens, storedProfile, storedSecurity, storedAuthMethod] = await Promise.all([
         this.getStoredTokens(),
         this.getStoredUserProfile(),
-        this.getStoredUserSecurity()
+        this.getStoredUserSecurity(),
+        this.getAuthMethod()
       ]);
 
       if (storedTokens && storedProfile) {
+        // Restore auth method
+        this.authMethod = storedAuthMethod;
+        
         // Check if tokens are still valid
         const isValid = await this.validateTokens(storedTokens);
         if (isValid) {
@@ -532,10 +843,19 @@ class AuthService {
           this.userProfile = storedProfile;
           this.userSecurity = storedSecurity;
         } else {
-          // Try to refresh tokens
-          const refreshedTokens = await this.refreshToken();
-          if (!refreshedTokens) {
-            await this.logout();
+          // Try to refresh tokens based on auth method
+          if (this.authMethod === 'api') {
+            const refreshedToken = await this.refreshApiToken();
+            if (!refreshedToken) {
+              // Clear data without calling logout to prevent recursion
+              this.clearAuthData();
+            }
+          } else {
+            const refreshedTokens = await this.refreshToken();
+            if (!refreshedTokens) {
+              // Clear data without calling logout to prevent recursion
+              this.clearAuthData();
+            }
           }
         }
       }
@@ -543,7 +863,11 @@ class AuthService {
       this.notifyStateChange();
     } catch (error) {
       console.error('Auth initialization error:', error);
-      await this.logout();
+      // Clear data without calling logout to prevent recursion
+      this.clearAuthData();
+      this.notifyStateChange();
+    } finally {
+      this.isInitializing = false;
     }
   }
 
