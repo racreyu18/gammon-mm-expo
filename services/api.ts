@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import authService from './authService';
 
 // API Configuration
 const API_CONFIG = {
@@ -83,13 +84,23 @@ class ApiService {
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     try {
+      // Get access token from auth service
+      const accessToken = await authService.getAccessToken();
+      
       const url = `${this.baseUrl}${endpoint}`;
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      };
+
+      // Add Bearer token if available
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
+
       const response = await fetch(url, {
         ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
+        headers,
         signal: AbortSignal.timeout(this.timeout),
       });
 
