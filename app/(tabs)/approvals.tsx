@@ -13,11 +13,11 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { apiService } from '../../services/api';
-import { useAuth } from '../../providers/AuthProvider';
-import { Approval } from '../../services/api';
-import { useApprovalUpdates } from '../../hooks/useListUpdates';
-import { useAppStateRefresh } from '../../hooks/useAppStateRefresh';
+import { apiService } from '@/services/api';
+import { useAuth } from '@/providers/AuthProvider';
+import { Approval } from '@/services/api';
+import { useApprovalUpdates } from '@/hooks/useListUpdates';
+import { useAppStateRefresh } from '@/hooks/useAppStateRefresh';
 
 export default function ApprovalsScreen() {
   const { t } = useTranslation();

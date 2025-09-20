@@ -12,14 +12,14 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 
-import { apiService } from '../../services/api';
-import { useAuth } from '../../providers/AuthProvider';
-import { useOfflineCapability } from '../../hooks/useOffline';
-import { CompactOfflineIndicator } from '../../components/OfflineIndicator';
-import { LoadingIndicator } from '../../utils/loadingState';
-import { Notification } from '../../services/api';
-import { useNotificationUpdates } from '../../hooks/useListUpdates';
-import { useAppStateRefresh } from '../../hooks/useAppStateRefresh';
+import { apiService } from '@/services/api';
+import { useAuth } from '@/providers/AuthProvider';
+import { useOfflineCapability } from '@/hooks/useOffline';
+import { CompactOfflineIndicator } from '@/components/OfflineIndicator';
+import { LoadingIndicator } from '@/utils/loadingState';
+import { Notification } from '@/services/api';
+import { useNotificationUpdates } from '@/hooks/useListUpdates';
+import { useAppStateRefresh } from '@/hooks/useAppStateRefresh';
 
 export default function NotificationsScreen() {
   const { t } = useTranslation();

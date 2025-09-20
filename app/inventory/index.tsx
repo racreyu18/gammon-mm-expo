@@ -11,15 +11,15 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { IconSymbol } from '../../components/ui/icon-symbol';
-import { Colors } from '../../constants/theme';
-import { useAuth } from '../../hooks/useAuth';
-import { useOffline } from '../../hooks/useOffline';
-import { useColorScheme } from '../../hooks/use-color-scheme';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Colors } from '@/constants/theme';
+import { useAuth } from '@/hooks/useAuth';
+import { useOffline } from '@/hooks/useOffline';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { createMovementService, MovementTransaction, MovementServiceConfig } from '@gammon/shared-core';
-import InventorySearchFilter, { InventorySearchParams } from '../components/InventorySearchFilter';
-import InventoryItemCard from '../components/InventoryItemCard';
-import { LoadingIndicator } from '../../utils/loadingState';
+import InventorySearchFilter, { InventorySearchParams } from '@/components/InventorySearchFilter';
+import InventoryItemCard from '@/components/InventoryItemCard';
+import { LoadingIndicator } from '@/utils/loadingState';
 
 export default function InventoryScreen() {
   const { t } = useTranslation();

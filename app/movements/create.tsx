@@ -8,9 +8,9 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/providers/AuthProvider';
-import { apiService, CreateMovementRequest } from '../../services/api';
-import { FormValidator, CommonSchemas, InputSanitizer } from '../../utils/inputValidation';
-import { ButtonLoading, useAsyncOperation } from '../../utils/loadingState';
+import { apiService, CreateMovementRequest } from '@/services/api';
+import { FormValidator, CommonSchemas, InputSanitizer } from '@/utils/inputValidation';
+import { ButtonLoading, useAsyncOperation } from '@/utils/loadingState';
 
 function CreateMovementScreenContent() {
   const { t } = useTranslation();

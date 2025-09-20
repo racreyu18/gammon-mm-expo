@@ -5,7 +5,7 @@ import { CameraView, BarcodeScanningResult } from 'expo-camera';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useOfflineCapable } from '../../hooks/useOffline';
+import { useOfflineCapable } from '@/hooks/useOffline';
 import { adapters } from '@/adapters';
 
 export default function ScanningScreen() {

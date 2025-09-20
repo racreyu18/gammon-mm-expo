@@ -13,12 +13,12 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { apiService } from '../../services/api';
-import { useAuth } from '../../providers/AuthProvider';
-import { Movement } from '../../services/api';
-import { useMovementUpdates } from '../../hooks/useListUpdates';
-import { useAppStateRefresh } from '../../hooks/useAppStateRefresh';
-import { useListPerformance, useSearchPerformance } from '../../hooks/useListPerformance';
+import { apiService } from '@/services/api';
+import { useAuth } from '@/providers/AuthProvider';
+import { Movement } from '@/services/api';
+import { useMovementUpdates } from '@/hooks/useListUpdates';
+import { useAppStateRefresh } from '@/hooks/useAppStateRefresh';
+import { useListPerformance, useSearchPerformance } from '@/hooks/useListPerformance';
 
 export default function MovementsScreen() {
   const { t } = useTranslation();

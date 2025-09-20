@@ -10,10 +10,10 @@ import {
 import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { apiService } from '../../services/apiService';
-import { useAuth } from '../../providers/AuthProvider';
-import { useOfflineCapability } from '../../hooks/useOffline';
-import { CompactOfflineIndicator } from '../../components/OfflineIndicator';
+import { apiService } from '@/services/apiService';
+import { useAuth } from '@/providers/AuthProvider';
+import { useOfflineCapability } from '@/hooks/useOffline';
+import { CompactOfflineIndicator } from '@/components/OfflineIndicator';
 
 const { width } = Dimensions.get('window');
 

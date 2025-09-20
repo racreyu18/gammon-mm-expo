@@ -7,9 +7,9 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 // Removed problematic react-native-reanimated import
 
-import { useColorScheme } from '../hooks/use-color-scheme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AppProviders } from '@/providers/app-providers';
-import { OfflineIndicator } from '../components/OfflineIndicator';
+import { OfflineIndicator } from '@/components/OfflineIndicator';
 import { useAutoSync } from '../hooks/useOffline';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.

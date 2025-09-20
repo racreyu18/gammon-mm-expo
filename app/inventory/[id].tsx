@@ -13,13 +13,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { router, useLocalSearchParams } from 'expo-router';
 import { createMovementService, MovementTransaction, MovementServiceConfig } from '@gammon/shared-core';
-import { useAuth } from '../../hooks/useAuth';
-import { useOfflineCapable } from '../../hooks/useOffline';
-import { IconSymbol } from '../../components/ui/icon-symbol';
-import { Colors } from '../../constants/theme';
-import { useColorScheme } from '../../hooks/use-color-scheme';
-import { FormValidator, CommonSchemas, InputSanitizer } from '../../utils/inputValidation';
-import { ButtonLoading, useAsyncOperation } from '../../utils/loadingState';
+import { useAuth } from '@/hooks/useAuth';
+import { useOfflineCapable } from '@/hooks/useOffline';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { FormValidator, CommonSchemas, InputSanitizer } from '@/utils/inputValidation';
+import { ButtonLoading, useAsyncOperation } from '@/utils/loadingState';
 
 export default function InventoryItemScreen() {
   const { t } = useTranslation();

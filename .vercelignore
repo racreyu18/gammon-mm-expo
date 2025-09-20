@@ -1,0 +1,89 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build artifacts and cache
+.expo/
+.expo-shared/
+android/
+ios/
+.gradle/
+build/
+*.apk
+*.ipa
+*.aab
+
+# Development files
+__tests__/
+*.test.*
+*.spec.*
+jest.config.*
+.eslintrc.*
+.prettierrc.*
+babel.config.js
+metro.config.js
+
+# Environment and config files
+.env*
+!.env.example
+.vscode/
+.cursor/
+
+# Logs and temporary files
+*.log
+.DS_Store
+Thumbs.db
+*.tmp
+*.temp
+
+# Source maps and debug files
+*.map
+debug-*.js
+
+# Package manager files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Git and version control
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+*.md
+!VERCEL_DEPLOYMENT.md
+
+# Scripts and tools
+scripts/
+mock-server.js
+debug-build.js
+debug-import.tsx
+
+# Test utilities and mocks
+src/test-utils/
+__mocks__/
+
+# EAS and Expo specific
+eas.json
+expo-env.d.ts
+
+# TypeScript config (not needed for runtime)
+tsconfig.json
+
+# Packages source (only need built dist)
+packages/*/src/
+packages/*/node_modules/
+packages/*/__tests__/
+packages/*/tsconfig.json
+
+# Large assets that aren't needed for web
+assets/images/large/
+assets/videos/
+assets/audio/
+
+# Vercel specific
+.vercel/

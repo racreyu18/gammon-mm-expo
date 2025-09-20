@@ -12,8 +12,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { router } from 'expo-router';
 import { createMovementService, MovementTransaction } from '@gammon/shared-core';
-import { useAuth } from '../../hooks/useAuth';
-import { ButtonLoading, useAsyncOperation } from '../../utils/loadingState';
+import { useAuth } from '@/hooks/useAuth';
+import { ButtonLoading, useAsyncOperation } from '@/utils/loadingState';
 
 // Configure service with proper base URL and token provider
 const serviceConfig = {

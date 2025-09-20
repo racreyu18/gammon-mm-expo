@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useOffline } from '../hooks/useOffline';
+import { useOffline } from '@/hooks/useOffline';
 import { logger } from '@gammon/shared-core';
 
 export default function OfflineSettingsScreen() {

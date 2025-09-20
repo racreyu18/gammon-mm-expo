@@ -9,11 +9,16 @@ export interface AzureConfig {
   scopes: string[];
 }
 
-const getRedirectUri = (): string => {
+const getRedirectUri = () => {
   if (Platform.OS === 'web') {
-    return 'http://localhost:8081/auth';
+    // It's recommended to use a fixed URL for web redirect
+    return typeof window !== 'undefined'
+      ? window.location.origin + '/auth'
+      : 'http://localhost:8081/auth';
   }
-  return 'gammonmmexpo://auth';
+  // For native, use the scheme + auth
+  const scheme = Constants.expoConfig?.scheme;
+  return scheme ? `${scheme}://auth` : 'gammonmmexpo://auth';
 };
 
 export const azureConfig: AzureConfig = {
